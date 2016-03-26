@@ -10,6 +10,7 @@ from sklearn import ensemble
 from sklearn.metrics import log_loss
 from sklearn.cross_validation import train_test_split, cross_val_score
 
+
 def find_denominator(df, col):
     """
     Function that trying to find an approximate denominator used for scaling.
@@ -29,10 +30,9 @@ def predict(clf, train, target, test, score, id_test):
     # print y_pred
 
     df = pd.DataFrame({"ID": id_test, "PredictedProb": y_pred[:, 1]})
-    df.to_csv('data/submission_extra_tree_{}.csv'.format(score), index=False)
+    df.to_csv('data/submission_stackin_rf_extra_tree_{}.csv'.format(score), index=False)
 
 if __name__ == '__main__':
-
     print('Load data...')
     train = pd.read_csv("data/train.csv")
     test = pd.read_csv("data/test.csv")
@@ -98,32 +98,22 @@ if __name__ == '__main__':
             if tmp_len>0:
                 test.loc[test_series.isnull(), test_name] = -999
 
+    for f in train.columns:
+        if train[f].dtype == 'object':
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(list(train[f].values))
+            train[f] = lbl.transform(list(train[f].values))
+
     print('Training...')
 
     X_train, X_test, y_train, y_test = train_test_split(train, target, random_state=1301, stratify=target, test_size=0.3)
 
-    #???? - Kaggle
-    #0.46009 - Local
-    # (n_estimators=400,
-    # max_features=30,
-    # criterion='entropy',
-    # min_samples_split=2,
-    # max_depth=30,
-    # min_samples_leaf=2,
-    # n_jobs=4,
-    # verbose=1,
-    # warm_start=True
-    # )
-    clf = ExtraTreesClassifier(n_estimators=1000,
-                               max_features=50,
-                               criterion='entropy',
-                               min_samples_split=4,
-                               max_depth=35,
-                               verbose=2,
-                               min_samples_leaf=2,
-                               n_jobs=-1)
+    #0.46176
+    # -----------------------
+    #   logloss train: 0.46203
+    # -----------------------
 
-    # clf = ExtraTreesClassifier(n_estimators=400,
+    # ext = ExtraTreesClassifier(n_estimators=400,
     #                            max_features=30,
     #                            criterion='entropy',
     #                            min_samples_split=2,
@@ -134,11 +124,64 @@ if __name__ == '__main__':
     #                            warm_start=True
     #                            )
 
+    et1 = ExtraTreesClassifier(n_estimators=1000,
+                               max_features=50,
+                               criterion='entropy',
+                               min_samples_split=4,
+                               max_depth=35,
+                               min_samples_leaf=2,
+                               verbose=2,
+                               n_jobs=-1)
+
+
+
+    rf1 = RandomForestClassifier(bootstrap=True,
+                                 criterion='entropy',
+                                 min_samples_split=4,
+                                 min_samples_leaf=2,
+                                 max_features=50,
+                                 max_depth=35,
+                                 n_estimators=1000,
+                                 n_jobs=4,
+                                 oob_score=False,
+                                 random_state=1301,
+                                 verbose=2)
+
+    # param_grid = {
+    #     'n_estimators': [10],
+    #     'max_features': ['auto', 2, 30],
+    #     'min_samples_leaf': [2, 8],
+    #     'max_leaf_nodes': [2, 8],
+    #     'min_samples_split': [2, 5],
+    #     'max_depth': [5, 20, 40],
+    #     'criterion': ['entropy', 'gini'],
+    # }
+
+
+    clfs = [('et1', et1), ('rf1', rf1)]
+    # set up ensemble of rf_1 and rf_2
+    clf = VotingClassifier(estimators=clfs, voting='soft', weights=[1, 1])
+
+    # clf = GridSearchCV(estimator=ext, param_grid=param_grid, cv= 5, scoring='log_loss', verbose=1)
+
+    # ('Raw LogLoss score:', -0.50747886759686722)
+    # criterion: 'gini'
+    # max_depth: 40
+    # max_features: 30
+    # max_leaf_nodes: 8
+    # min_samples_leaf: 8
+    # min_samples_split: 5
+    # n_estimators: 10
+    # best_parameters, score, _ = max(clf.grid_scores_, key=lambda x: x[1])
+    # print('Raw LogLoss score:', score)
+    # for param_name in sorted(best_parameters.keys()):
+    #     print("%s: %r" % (param_name, best_parameters[param_name]))
+
     clf.fit(X_train, y_train)
     clf_probs = clf.predict_proba(X_test)
     score = log_loss(y_test, clf_probs)
 
     print('logloss Score: %.5f' % score)
 
-    if (score < 0.47):
+    if (score < 0.46):
         predict(clf, train, target, test, score, id_test)
