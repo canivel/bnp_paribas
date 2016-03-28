@@ -130,19 +130,21 @@ print('Training...')
 #100 estimators 100 features
 #Local-0.05141 : Kaggle-0.46329
 
-#1000 estimators 40 features
-#local loss .06681 = 0.45417
+#1000 estimators 100 features
+#local loss 0.05131 = 0.45566
 
 #1000 estimators 40 features
 #local loss .06681 = 0.45417
 
-#1200 estimators
+#1500 estimators 50 features
+#local 0.07935 = 0.45566
+
 clf = ExtraTreesClassifier(
-    n_estimators=1000,
-    max_features=100,
+    n_estimators=1500,
+    max_features=50,
     criterion='entropy',
     min_samples_split=2,
-    max_depth=40,
+    max_depth=35,
     min_samples_leaf=2,
     n_jobs=-1,
     verbose=2)
