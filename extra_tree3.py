@@ -7,8 +7,9 @@ from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn import ensemble
 from sklearn.metrics import log_loss
-from sklearn.cross_validation import train_test_split, cross_val_score
-from sklearn.preprocessing import LabelEncoder
+from sklearn.cross_validation import train_test_split, cross_val_score, StratifiedKFold
+from sklearn.preprocessing import LabelEncoder, StandardScaler
+from sklearn.grid_search import GridSearchCV
 
 def find_denominator(df, col):
     """
@@ -39,8 +40,6 @@ high_correlations = [
 train = train.drop(high_correlations, axis=1)
 test = test.drop(high_correlations, axis=1)
 
-
-
 print('Clearing...')
 num_vars = ['v1', 'v2', 'v4', 'v5', 'v6', 'v7', 'v9', 'v10', 'v11',
             'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20',
@@ -68,81 +67,84 @@ for c in num_vars:
 
 print (train.shape, test.shape)
 
-shapeTrain = train.shape[0]
-shapeTest = test.shape[0]
-train = train.append(test)
-encoded_columns = []
-for f in train.columns:
-
-    if train[f].dtype == 'object':
-        lbl = LabelEncoder()
-        lbl.fit(list(train[f].values))
-        train[f] = lbl.transform(list(train[f].values))
-        encoded_columns.append(f)
-        # if test[f].dtype == 'object':
-        #     lbl = preprocessing.LabelEncoder()
-        #     lbl.fit(list(test[f].values))
-        #     test[f] = lbl.transform(list(test[f].values))
-
-test = train[shapeTrain:shapeTrain + shapeTest]
-train = train[0:shapeTrain]
-
-print('Making dummy features')
-for f in encoded_columns:
-    print(train[f].max())
-    #try without the limit with more processing
-    if(train[f].max() == test[f].max() and train[f].max() < 1000):
-        train_dummies = pd.get_dummies(train[f]).astype(np.int16)
-        test_dummies = pd.get_dummies(test[f]).astype(np.int16)
-
-        if(train_dummies.shape[1] == test_dummies.shape[1]):
-
-            columns_train = train_dummies.columns.tolist()  # get the columns
-            columns_test = test_dummies.columns.tolist()  # get the columns
-
-            cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
-            cols_to_use_test = columns_test[:len(columns_test) - 1]  # drop the last one
-
-            train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
-            test = pd.concat([test, test_dummies[cols_to_use_test]], axis=1)
-
-            train.drop([f], inplace=True, axis=1)
-            test.drop([f], inplace=True, axis=1)
-
-
-print('filling NaN')
 for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(),test.iteritems()):
-    if train_series.dtype != 'O':
-
+    if train_series.dtype == 'O':
+        #for objects: factorize
+        train[train_name], tmp_indexer = pd.factorize(train[train_name])
+        test[test_name] = tmp_indexer.get_indexer(test[test_name])
+        #but now we have -1 values (NaN)
+    else:
         #for int or float: fill NaN
         tmp_len = len(train[train_series.isnull()])
         if tmp_len>0:
             #print "mean", train_series.mean()
-            train.loc[train_series.isnull(), train_name] = -999
+            train.loc[train_series.isnull(), train_name] = -997
         #and Test
         tmp_len = len(test[test_series.isnull()])
         if tmp_len>0:
-            test.loc[test_series.isnull(), test_name] = -999
+            test.loc[test_series.isnull(), test_name] = -997
 
-        #for objects: factorize
-        # train[train_name], tmp_indexer = pd.factorize(train[train_name])
-        # test[test_name] = tmp_indexer.get_indexer(test[test_name])
-        #but now we have -1 values (NaN)
 
 print (train.shape, test.shape)
 
 X_train, X_test, y_train, y_test = train_test_split(train, target, random_state=1301, stratify=target, test_size=0.3)
 
+
+
+
+# parameters = {
+#               'max_features': ['auto', 50, 60],
+#               'min_samples_split': [2, 4, 8],
+#               'max_depth': [10, 35, 40],
+#               'min_samples_leaf': [2, 4]
+#               }
+
+# clf = ExtraTreesClassifier(
+#     n_estimators=100,
+#     criterion='entropy',
+#     n_jobs=-1,
+#     verbose=2)
+
+# clf = GridSearchCV(model, parameters, n_jobs=4,
+#                    cv=StratifiedKFold(target, n_folds=10, shuffle=True),
+#                    verbose=2, refit=True, scoring='log_loss')
+# max_depth: 40
+# max_features: 50
+# min_samples_leaf: 2
+# min_samples_split: 2
+
+
+# clf.fit(train, target)
+
+# best_parameters, score, _ = max(clf.grid_scores_, key=lambda x: x[1])
+# print('Log Loss score:', score)
+# for param_name in sorted(best_parameters.keys()):
+#     print("%s: %r" % (param_name, best_parameters[param_name]))
+
+
+
+
+
+##############################
 print('Training...')
-#0.46119
+#100 estimators 100 features
+#Local-0.05141 : Kaggle-0.46329
+
+#1000 estimators 40 features
+#local loss .06681 = 0.45417
+
+#1000 estimators 40 features
+#local loss .06681 = 0.45417
+
+#1200 estimators
 clf = ExtraTreesClassifier(
     n_estimators=1000,
-    max_features=50,
+    max_features=100,
     criterion='entropy',
-    min_samples_split=4,
-    max_depth=35,
+    min_samples_split=2,
+    max_depth=40,
     min_samples_leaf=2,
-    n_jobs=4,
+    n_jobs=-1,
     verbose=2)
 
 clf.fit(train,target)
@@ -153,6 +155,6 @@ score = log_loss(y_test, clf.predict_proba(X_test)[:, 1])
 #
 print('logloss Score: %.5f' % score)
 
-if(score < 0.454):
+if(score < 0.065):
     y_pred = clf.predict_proba(test)
-    pd.DataFrame({"ID": id_test, "PredictedProb": y_pred[:,1]}).to_csv('data/extra_trees_v3_1.csv',index=False)
+    pd.DataFrame({"ID": id_test, "PredictedProb": y_pred[:,1]}).to_csv('data/extra_trees_v3_2.csv',index=False)
