@@ -6,8 +6,7 @@ import csv
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import ExtraTreesClassifier
 from sklearn import ensemble
-from sklearn.metrics import log_loss
-from sklearn.cross_validation import train_test_split, cross_val_score
+
 
 def find_denominator(df, col):
     """
@@ -67,25 +66,16 @@ for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(
         if tmp_len>0:
             test.loc[test_series.isnull(), test_name] = -999
 
-X_train, X_test, y_train, y_test = train_test_split(train, target, random_state=1301, stratify=target, test_size=0.3)
-
+X_train = train
+X_test = test
 print('Training...')
-#0.45390
-clf = ExtraTreesClassifier(
-    n_estimators=1000,
-    max_features= 50,
-    criterion= 'entropy',
-    min_samples_split= 4,
-    max_depth= 35,
-    min_samples_leaf= 2,
-    n_jobs = -1)
+extc = ExtraTreesClassifier(n_estimators=1000,max_features= 50,criterion= 'entropy',min_samples_split= 4,
+                            max_depth= 35, min_samples_leaf= 2, n_jobs = -1)      
 
-clf.fit(train,target)
+extc.fit(X_train,target) 
 
 print('Predict...')
-y_pred = clf.predict_proba(train)
-score = log_loss(y_test, y_pred)
-
-print('logloss Score: %.5f' % score)
+y_pred = extc.predict_proba(X_test)
+#print y_pred
 
 pd.DataFrame({"ID": id_test, "PredictedProb": y_pred[:,1]}).to_csv('data/extra_trees_forum.csv',index=False)

@@ -115,18 +115,18 @@ if __name__ == '__main__':
 
             train_dummies = pd.get_dummies(train[f]).astype(np.int16)
             test_dummies = pd.get_dummies(test[f]).astype(np.int16)
+            if(train_dummies.shape[1] == test_dummies.shape[1]):
+                columns_train = train_dummies.columns.tolist() # get the columns
+                columns_test = test_dummies.columns.tolist() # get the columns
 
-            columns_train = train_dummies.columns.tolist() # get the columns
-            columns_test = test_dummies.columns.tolist() # get the columns
+                cols_to_use_train = columns_train[:len(columns_train)-1] # drop the last one
+                cols_to_use_test = columns_test[:len(columns_test)-1] # drop the last one
 
-            cols_to_use_train = columns_train[:len(columns_train)-1] # drop the last one
-            cols_to_use_test = columns_test[:len(columns_test)-1] # drop the last one
+                train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
+                test = pd.concat([test, test_dummies[cols_to_use_test]], axis=1)
 
-            train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
-            test = pd.concat([test, test_dummies[cols_to_use_test]], axis=1)
-
-            train.drop([f], inplace=True, axis=1)
-            test.drop([f], inplace=True, axis=1)
+                train.drop([f], inplace=True, axis=1)
+                test.drop([f], inplace=True, axis=1)
 
 
     # test_enc = []
