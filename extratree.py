@@ -8,6 +8,7 @@ from sklearn.grid_search import GridSearchCV
 from sklearn.feature_selection import VarianceThreshold
 from sklearn import ensemble
 from sklearn.metrics import log_loss
+from sklearn import  preprocessing
 from sklearn.cross_validation import train_test_split, cross_val_score
 
 def find_denominator(df, col):
@@ -69,6 +70,28 @@ if __name__ == '__main__':
     test = test.drop(high_correlations, axis=1)
 
     print('Clearing...')
+    print (train.shape, test.shape)
+    shapeTrain = train.shape[0]
+    shapeTest = test.shape[0]
+    train = train.append(test)
+    print (train.shape, test.shape)
+    for f in train.columns:
+
+        if train[f].dtype == 'object':
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(list(train[f].values))
+            train[f] = lbl.transform(list(train[f].values))
+
+        # if test[f].dtype == 'object':
+        #     lbl = preprocessing.LabelEncoder()
+        #     lbl.fit(list(test[f].values))
+        #     test[f] = lbl.transform(list(test[f].values))
+
+    test = train[shapeTrain:shapeTrain+shapeTest]
+    train = train[0:shapeTrain]
+
+    print (train.shape, test.shape)
+
     vs = pd.concat([train, test])
     for c in num_vars:
         if c not in train.columns:
@@ -81,22 +104,71 @@ if __name__ == '__main__':
         train[c] *= 1/denominator
         test[c] *= 1/denominator
 
+    for f in train.columns:
+        if(train[f].max() == test[f].max() and train[f].max() < 1000):
+
+            train_dummies = pd.get_dummies(train[f]).astype(np.int16)
+            test_dummies = pd.get_dummies(test[f]).astype(np.int16)
+
+            columns_train = train_dummies.columns.tolist() # get the columns
+            columns_test = test_dummies.columns.tolist() # get the columns
+
+            cols_to_use_train = columns_train[:len(columns_train)-1] # drop the last one
+            cols_to_use_test = columns_test[:len(columns_test)-1] # drop the last one
+
+            train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
+            test = pd.concat([test, test_dummies[cols_to_use_test]], axis=1)
+
+            train.drop([f], inplace=True, axis=1)
+            test.drop([f], inplace=True, axis=1)
+
+
+    # test_enc = []
+    # for f in test.columns:
+    #     if test[f].dtype == 'object':
+    #         test_enc.append(f)
+    #         lbl = preprocessing.LabelEncoder()
+    #         lbl.fit(list(test[f].values))
+    #         test[f] = lbl.transform(list(test[f].values))
+    #         if(test[f].max() <= 10):
+    #             just_dummies = pd.get_dummies(test[f]).astype(np.int8)
+    #             columns = just_dummies.columns.tolist() # get the columns
+    #             cols_to_use = columns[:len(columns)-1] # drop the last one
+    #             test = pd.concat([test, just_dummies[cols_to_use]], axis=1)
+    #             test.drop([f], inplace=True, axis=1)
+    #         print test.shape
+
+
+
     for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(),test.iteritems()):
-        if train_series.dtype == 'O':
-            #for objects: factorize
-            train[train_name], tmp_indexer = pd.factorize(train[train_name])
-            test[test_name] = tmp_indexer.get_indexer(test[test_name])
-            #but now we have -1 values (NaN)
-        else:
+        if train_series.dtype != 'O':
             #for int or float: fill NaN
             tmp_len = len(train[train_series.isnull()])
             if tmp_len>0:
                 #print "mean", train_series.mean()
-                train.loc[train_series.isnull(), train_name] = -999
+                train.loc[train_series.isnull(), train_name] = -997
             #and Test
             tmp_len = len(test[test_series.isnull()])
             if tmp_len>0:
-                test.loc[test_series.isnull(), test_name] = -999
+                test.loc[test_series.isnull(), test_name] = -997
+
+    ######################################################
+    print (train.shape, test.shape)
+    # print ('Normalizing')
+    #
+    # scaler = StandardScaler()
+    # train = scaler.fit_transform(train)
+    # test = scaler.fit_transform(test)
+    print ('Creating Features')
+
+    train = np.array(train)
+    test = np.array(test)
+
+    # object array to float
+    train = train.astype(float)
+    test = test.astype(float)
+
+    label_log = np.log1p(target)
 
     print('Training...')
 
