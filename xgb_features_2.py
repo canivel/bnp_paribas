@@ -70,8 +70,6 @@ if __name__ == '__main__':
     #     'v95', 'v105', 'v107', 'v108', 'v109', 'v110', 'v116', 'v117', 'v118', 'v119', 'v123', 'v124', 'v128'
     # ]
 
-    high_correlations = ['v75', 'v107', 'v110']
-
     # num_vars = ['v1', 'v2', 'v4', 'v5', 'v6', 'v7', 'v9', 'v10', 'v11',
     #             'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20',
     #             'v21', 'v26', 'v27', 'v28', 'v29', 'v32', 'v33', 'v34', 'v35', 'v38',
@@ -83,10 +81,10 @@ if __name__ == '__main__':
     #             'v115', 'v120', 'v121', 'v122', 'v126', 'v127', 'v129', 'v130', 'v131']
 
     train = train.drop(['ID', 'target'], axis=1)
-    train = train.drop(high_correlations, axis=1)
+    #train = train.drop(high_correlations, axis=1)
 
     test = test.drop(['ID'], axis=1)
-    test = test.drop(high_correlations, axis=1)
+    #test = test.drop(high_correlations, axis=1)
 
     print('Enginneering...')
 
