@@ -140,7 +140,7 @@ print('Training...')
 #local 0.07935 = 0.45566
 
 clf = ExtraTreesClassifier(
-    n_estimators=1500,
+    n_estimators=1000,
     max_features=50,
     criterion='entropy',
     min_samples_split=2,
