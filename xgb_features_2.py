@@ -5,13 +5,13 @@ from sklearn.cross_validation import train_test_split
 from sklearn.feature_selection import SelectPercentile, f_classif, chi2
 from sklearn.preprocessing import Binarizer, scale, StandardScaler, OneHotEncoder
 from sklearn import preprocessing
-from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
 from sklearn.metrics import log_loss
 from sklearn.preprocessing import PolynomialFeatures, Imputer
 import pickle
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_selection import SelectFromModel
-
+import boruta
 
 def impute_most_frequent(data):
     clf = Imputer(missing_values='NaN', strategy='most_frequent', axis=0).fit(data)
@@ -56,10 +56,10 @@ if __name__ == '__main__':
                 'v115', 'v120', 'v121', 'v122', 'v126', 'v127', 'v129', 'v130', 'v131']
 
     train = train.drop(['ID', 'target'], axis=1)
-    train = train.drop(high_correlations, axis=1)
+    #train = train.drop(high_correlations, axis=1)
 
     test = test.drop(['ID'], axis=1)
-    test = test.drop(high_correlations, axis=1)
+    #test = test.drop(high_correlations, axis=1)
 
     print('Enginneering...')
 
@@ -86,8 +86,8 @@ if __name__ == '__main__':
     # train['v22_new'] = lbl.transform(list(train['v22'].values))
     # train = train.drop(['v22'], axis=1)
 
-    train['null_count'] = train.isnull().sum(axis=1).tolist()
-
+    #train['null_count'] = train.isnull().sum(axis=1).tolist()
+    train = train.fillna(-977)
     print('Generating dummies...')
     for f in train.columns:
         if (train[f].dtype == 'object'):
@@ -102,26 +102,55 @@ if __name__ == '__main__':
             train.drop([f], inplace=True, axis=1)
 
 
-    print('Generating Polynomial...')
-    etc = ExtraTreesClassifier(n_estimators=150,
-                               max_features=50,
-                               criterion='entropy',
-                               min_samples_split=2,
-                               max_depth=35,
-                               min_samples_leaf=2,
-                               n_jobs=-1,
-                               verbose=2)
 
-    train = train.fillna(-977)
-    etc.fit(train, all_values_full_target)
-    model = SelectFromModel(etc, prefit=True)
-    train_new = model.transform(train)
-    print('--------- train_new', train_new.shape)
-    poly = PolynomialFeatures(3)
-    train_poly = poly.fit_transform(train_new)
-    train = pd.DataFrame(train_poly)
+    #print('Generating Polynomial...')
+    # etc = ExtraTreesClassifier(n_estimators=150,
+    #                            max_features=50,
+    #                            criterion='entropy',
+    #                            min_samples_split=2,
+    #                            max_depth=35,
+    #                            min_samples_leaf=2,
+    #                            n_jobs=-1,
+    #                            verbose=2)
 
-    print('Shape after poly', train.shape)
+    # print('fill the nans ...')
+    # train = train.fillna(-977)
+    # rf.fit(train, all_values_full_target)
+    # model = SelectFromModel(rf, prefit=True)
+    # train_new = model.transform(train)
+    # print('--------- train_new', train_new.shape)
+    # poly = PolynomialFeatures()
+    # train_poly = poly.fit_transform(train_new)
+    # train = pd.DataFrame(train_poly)
+    # print('Shape after poly', train.shape)
+
+
+    print('Selecting Features ...')
+
+    p = 80 # 261 features validation_1-auc:0.0.845549
+
+    X_bin = Binarizer().fit_transform(scale(train))
+    selectChi2 = SelectPercentile(chi2, percentile=p).fit(X_bin, all_values_full_target)
+    selectF_classif = SelectPercentile(f_classif, percentile=p).fit(train, all_values_full_target)
+
+    chi2_selected = selectChi2.get_support()
+    chi2_selected_features = [ f for i,f in enumerate(train.columns) if chi2_selected[i]]
+    print('Chi2 selected {} features {}.'.format(chi2_selected.sum(),
+       chi2_selected_features))
+    f_classif_selected = selectF_classif.get_support()
+    f_classif_selected_features = [ f for i,f in enumerate(train.columns) if f_classif_selected[i]]
+    print('F_classif selected {} features {}.'.format(f_classif_selected.sum(),
+       f_classif_selected_features))
+    selected = chi2_selected & f_classif_selected
+    print('Chi2 & F_classif selected {} features'.format(selected.sum()))
+    features = [ f for f,s in zip(train.columns, selected) if s]
+    print (features)
+
+    train = train[features]
+
+    print('Finish feature select', train.shape)
+
+
 
     print('Reshaping Train and test ...')
     test = train[shapeTrain:shapeTrain + shapeTest]
@@ -129,25 +158,44 @@ if __name__ == '__main__':
 
     print (train.shape, test.shape)
 
-    print('fill the nans ...')
+    # print('fill the nans ...')
+    #
+    # for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(), test.iteritems()):
+    #     # if train_series.dtype == 'O':
+    #     #     #for objects: factorize
+    #     #     train[train_name], tmp_indexer = pd.factorize(train[train_name])
+    #     #     test[test_name] = tmp_indexer.get_indexer(test[test_name])
+    #     #
+    #     #     #but now we have -1 values (NaN)
+    #     # else:
+    #     # for int or float: fill NaN
+    #     tmp_len = len(train[train_series.isnull()])
+    #     if tmp_len > 0:
+    #         # print "mean", train_series.mean()
+    #         train.loc[train_series.isnull(), train_name] = -997
+    #         # and Test
+    #     tmp_len = len(test[test_series.isnull()])
+    #     if tmp_len > 0:
+    #         test.loc[test_series.isnull(), test_name] = -997
 
-    for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(), test.iteritems()):
-        # if train_series.dtype == 'O':
-        #     #for objects: factorize
-        #     train[train_name], tmp_indexer = pd.factorize(train[train_name])
-        #     test[test_name] = tmp_indexer.get_indexer(test[test_name])
-        #
-        #     #but now we have -1 values (NaN)
-        # else:
-        # for int or float: fill NaN
-        tmp_len = len(train[train_series.isnull()])
-        if tmp_len > 0:
-            # print "mean", train_series.mean()
-            train.loc[train_series.isnull(), train_name] = -997
-            # and Test
-        tmp_len = len(test[test_series.isnull()])
-        if tmp_len > 0:
-            test.loc[test_series.isnull(), test_name] = -997
+    # p = 75 # 261 features validation_1-auc:0.0.845549
+    #
+    # X_bin = Binarizer().fit_transform(scale(train))
+    # selectChi2 = SelectPercentile(chi2, percentile=p).fit(X_bin, target)
+    # selectF_classif = SelectPercentile(f_classif, percentile=p).fit(train, target)
+    #
+    # chi2_selected = selectChi2.get_support()
+    # chi2_selected_features = [ f for i,f in enumerate(train.columns) if chi2_selected[i]]
+    # print('Chi2 selected {} features {}.'.format(chi2_selected.sum(),
+    #    chi2_selected_features))
+    # f_classif_selected = selectF_classif.get_support()
+    # f_classif_selected_features = [ f for i,f in enumerate(train.columns) if f_classif_selected[i]]
+    # print('F_classif selected {} features {}.'.format(f_classif_selected.sum(),
+    #    f_classif_selected_features))
+    # selected = chi2_selected & f_classif_selected
+    # print('Chi2 & F_classif selected {} features'.format(selected.sum()))
+    # features = [ f for f,s in zip(train.columns, selected) if s]
+    # print (features)
 
     # print('find denominator ...')
     # vs = pd.concat([train, test])
@@ -223,6 +271,7 @@ if __name__ == '__main__':
     print('Predict')
     y_cv_pred = model.predict(xgval)
     print('CV:', log_loss(validlabels, np.clip(y_cv_pred, 0.01, 0.99)))
+    # CV: 0.46024451001464933 - 0.46287
 
     y_pred = model.predict(xgtest)
 
@@ -255,7 +304,7 @@ if __name__ == '__main__':
     # clf.fit(X_train, y_train, early_stopping_rounds=50, eval_metric="logloss", eval_set=[(X_test, y_test)])
     #
     # #local: 0.467156 | real:  0.46102
-    # #CV: 0.463081
+    # #CV: 0.46024451001464933
     #
     #
     # print('CV: {}'.format(clf.best_score))
