@@ -114,8 +114,8 @@ if __name__ == '__main__':
     train['v78'] = train['v78'].fillna(train['v78'].mean())
     # train['v129'] = train['v129'].fillna(train['v129'].mean())
 
-    for i in num_vars:
-        train[i] = train[i].fillna(train[i].mean())
+    # for i in num_vars:
+    #     train[i] = train[i].fillna(train[i].mean())
 
 
     # train['v22'].fillna('C0', inplace=True)
@@ -250,23 +250,37 @@ if __name__ == '__main__':
     xgtest = xgb.DMatrix(test)
 
     ROUNDS = 600
-
-    params = {
-        'objective': 'binary:logistic',
-        'learning_rate': 0.05,
-        #'eta':0.05,
-        #'n_estimators': 1500,
-        'subsample': 1,
-        'colsample_bytree': 0.4,
-        'colsample_bylevel': 0.4,
-        'max_depth': 11,
-        'eval_metric': 'logloss',
-        'silent': 0,
-        'nthread': 4,
-        'seed': 1313
-    }
-
     watchlist = [(xgtrain, 'train'), (xgval, 'val')]
+
+    yevalpred_list = []
+    ypred_list = []
+
+    seeds_list = [2017, 2018, 2019, 2020]
+    #2017 best seed
+    print('Start Bagging')
+    for seed in seeds_list:
+        params = {
+            'objective': 'binary:logistic',
+            'learning_rate': 0.05,
+            #'eta':0.05,
+            #'n_estimators': 1500,
+            'subsample': 1,
+            'colsample_bytree': 0.4,
+            'colsample_bylevel': 0.4,
+            'max_depth': 11,
+            'eval_metric': 'logloss',
+            'silent': 0,
+            'nthread': 4,
+            'seed': seed
+        }
+
+        print('Training', seed)
+        model = xgb.train(params, xgtrain, 300, watchlist, early_stopping_rounds=50)
+        y_cv_pred = model.predict(xgval)
+        y_pred = model.predict(xgtest)
+
+        yevalpred_list.append(y_cv_pred)
+        ypred_list.append(y_pred)
 
     # print('Cross Validation')
     # cv = xgb.cv(params, xgtrain, ROUNDS, nfold=5, metrics={'logloss'}, show_progress=True, as_pandas=True, seed=4242)
@@ -280,31 +294,36 @@ if __name__ == '__main__':
     #
     #
     # num_boost_round=cv['test-logloss-mean'].idxmin()
-    print('Training')
-    model = xgb.train(params, xgtrain, 300, watchlist, early_stopping_rounds=50)
+    # print('Training')
+    # model = xgb.train(params, xgtrain, 300, watchlist, early_stopping_rounds=50)
 
-    print('Predict')
-    y_cv_pred = model.predict(xgval)
-    print('CV:', log_loss(validlabels, np.clip(y_cv_pred, 0.01, 0.99)))
+    # print('Predict')
+    # y_cv_pred = model.predict(xgval)
+    pred_eval = np.mean(np.array(yevalpred_list), axis = 0)
+    print('CV:', log_loss(validlabels, np.clip(pred_eval, 0.01, 0.99)))
 
-    y_pred = model.predict(xgtest)
+    # y_pred = model.predict(xgtest)
+    pred_final = np.mean(np.array(ypred_list), axis = 0)
 
-    pd.DataFrame({"ID": id_test, "PredictedProb": np.clip(y_pred, 0.01, 0.99)}).to_csv('submission_xgb_compact_1.csv',
-                                                                                       index=False)
+    # pd.DataFrame({"ID": id_test, "PredictedProb": np.clip(y_pred, 0.01, 0.99)}).to_csv('submission_xgb_compact_1.csv',
+    #                                                                                    index=False)
+
+    submission = pd.DataFrame({"ID":id_test, "PredictedProb":pred_final})
+    submission.to_csv("submission_bagging_xgb.csv", index=False)
 
 
-    importance = model.get_fscore(fmap='xgb.fmap')
-    importance = sorted(importance.items(), key=operator.itemgetter(1))
-
-    df = pd.DataFrame(importance[:30], columns=['feature', 'fscore'])
-    df['fscore'] = df['fscore'] / df['fscore'].sum()
-
-    plt.figure()
-    df.plot()
-    df.plot(kind='barh', x='feature', y='fscore', legend=False, figsize=(20, 15))
-    plt.title('XGBoost Feature Importance')
-    plt.xlabel('relative importance')
-    plt.gcf().savefig('feature_importance_xgb.png')
+    # importance = model.get_fscore(fmap='xgb.fmap')
+    # importance = sorted(importance.items(), key=operator.itemgetter(1))
+    #
+    # df = pd.DataFrame(importance[:30], columns=['feature', 'fscore'])
+    # df['fscore'] = df['fscore'] / df['fscore'].sum()
+    #
+    # plt.figure()
+    # df.plot()
+    # df.plot(kind='barh', x='feature', y='fscore', legend=False, figsize=(20, 15))
+    # plt.title('XGBoost Feature Importance')
+    # plt.xlabel('relative importance')
+    # plt.gcf().savefig('feature_importance_xgb.png')
 
     #     y_pred = clf.predict_proba(test, ntree_limit=clf.best_iteration)[:, 1]
     #     submission = pd.DataFrame({"ID": id_test, "PredictedProb": y_pred})
