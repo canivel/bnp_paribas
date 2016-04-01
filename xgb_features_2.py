@@ -107,11 +107,13 @@ if __name__ == '__main__':
     train['v50'] = train['v50'].fillna(train['v50'].mean())
     train['v55'] = train['v55'].fillna(train['v55'].mean())
     train['v16'] = train['v16'].fillna(train['v16'].mean())
-    train['v34'] = train['v34'].fillna(train['v34'].mean())
-    train['v21'] = train['v21'].fillna(train['v21'].mean())
-    train['v12'] = train['v12'].fillna(train['v12'].mean())
-    train['v38'] = train['v38'].fillna(train['v38'].mean())
-    train['v78'] = train['v78'].fillna(train['v78'].mean())
+    # train['v34'] = train['v34'].fillna(train['v34'].mean())
+    # train['v21'] = train['v21'].fillna(train['v21'].mean())
+    # train['v12'] = train['v12'].fillna(train['v12'].mean())
+    #train['v38'] = train['v38'].fillna(train['v38'].mean())
+    # train['v78'] = train['v78'].fillna(train['v78'].mean())
+    #train['v69'] = train['v69'].fillna(train['v69'].mean())
+    #train['v78'] = train['v78'].fillna(train['v78'].mean())
     # train['v129'] = train['v129'].fillna(train['v129'].mean())
 
     # for i in num_vars:
@@ -157,7 +159,7 @@ if __name__ == '__main__':
         train[new_c2] = train[f]*(train['v129']+train['v55'])
         #val-logloss:0.460323
 
-        # train[new_c4] = train[f]*(train['v3_new_f']+train['v74_new_f'])
+        #train[new_c4] = train[f]*(train['v69']+train['v38'])
         # train[new_c5] = train[f]*(train['v3_new_f']+train['v78'])
         # train[new_c6] = train[f]*(train['v22']+train['v55'])
         # train[new_c8] = train[f]*(train['v14']+train['v38'])
@@ -255,7 +257,7 @@ if __name__ == '__main__':
     yevalpred_list = []
     ypred_list = []
 
-    seeds_list = [2017, 2018, 2019, 2020]
+    seeds_list = [2017]
     #2017 best seed
     print('Start Bagging')
     for seed in seeds_list:
