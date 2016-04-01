@@ -5,13 +5,28 @@ from sklearn.cross_validation import train_test_split
 from sklearn.feature_selection import SelectPercentile, f_classif, chi2
 from sklearn.preprocessing import Binarizer, scale, StandardScaler, OneHotEncoder
 from sklearn import preprocessing
-from sklearn.ensemble import ExtraTreesClassifier, RandomForestClassifier
+from sklearn.ensemble import ExtraTreesClassifier
 from sklearn.metrics import log_loss
 from sklearn.preprocessing import PolynomialFeatures, Imputer
 import pickle
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.feature_selection import SelectFromModel
-import boruta
+import operator
+import matplotlib
+import matplotlib.pyplot as plt
+matplotlib.use("Agg") #Needed to save figures
+
+def az_to_int(az,nanVal=None):
+    if az==az:  #catch NaN
+        hv = 0
+        for i in range(len(az)):
+            hv += (ord(az[i].lower())-ord('a')+1)*26**(len(az)-1-i)
+        return hv
+    else:
+        if nanVal is not None:
+            return nanVal
+        else:
+            return az
 
 def impute_most_frequent(data):
     clf = Imputer(missing_values='NaN', strategy='most_frequent', axis=0).fit(data)
@@ -27,6 +42,16 @@ def find_denominator(df, col):
     vals = pd.rolling_apply(vals, 2, lambda x: x[1] - x[0])
     vals = vals[vals > 0.000001]
     return vals.value_counts().idxmax()
+
+
+def ceate_feature_map(features):
+    outfile = open('xgb.fmap', 'w')
+    i = 0
+    for feat in features:
+        outfile.write('{0}\t{1}\tq\n'.format(i, feat))
+        i = i + 1
+
+    outfile.close()
 
 if __name__ == '__main__':
 
@@ -56,19 +81,10 @@ if __name__ == '__main__':
                 'v115', 'v120', 'v121', 'v122', 'v126', 'v127', 'v129', 'v130', 'v131']
 
     train = train.drop(['ID', 'target'], axis=1)
-    #train = train.drop(high_correlations, axis=1)
+    train = train.drop(high_correlations, axis=1)
 
     test = test.drop(['ID'], axis=1)
-    #test = test.drop(high_correlations, axis=1)
-
-    print('Enginneering...')
-
-    print('v22 encode')
-    train['v22'].fillna('C0', inplace=True)
-    test['v22'].fillna('C0', inplace=True)
-    v22_freqs = dict(train['v22'].value_counts())
-    train.loc[:, 'v22'] = [('C%d' % v22_freqs[s]) for s in train['v22'].values]
-    test.loc[:, 'v22'] = [('C%d' % v22_freqs.get(s, 1)) for s in test['v22'].values]
+    test = test.drop(high_correlations, axis=1)
 
     shapeTrain = train.shape[0]
     shapeTest = test.shape[0]
@@ -81,29 +97,73 @@ if __name__ == '__main__':
     # print(full_target.tail())
     # exit()
 
-    # lbl = preprocessing.LabelEncoder()
-    # lbl.fit(list(train['v22'].values))
-    # train['v22_new'] = lbl.transform(list(train['v22'].values))
-    # train = train.drop(['v22'], axis=1)
+    print('Enginneering...')
 
-    #train['null_count'] = train.isnull().sum(axis=1).tolist()
+    print('v22 encode')
+
+    train['v22'] = train['v22'].apply(az_to_int)
+
+    print('fill the means ...')
+    train['v50'] = train['v50'].fillna(train['v50'].mean())
+    train['v55'] = train['v55'].fillna(train['v55'].mean())
+    train['v16'] = train['v16'].fillna(train['v16'].mean())
+    train['v34'] = train['v34'].fillna(train['v34'].mean())
+    train['v21'] = train['v21'].fillna(train['v21'].mean())
+    train['v12'] = train['v12'].fillna(train['v12'].mean())
+    train['v38'] = train['v38'].fillna(train['v38'].mean())
+    train['v78'] = train['v78'].fillna(train['v78'].mean())
+    # train['v129'] = train['v129'].fillna(train['v129'].mean())
+
+    for i in num_vars:
+        train[i] = train[i].fillna(train[i].mean())
+
+
+    # train['v22'].fillna('C0', inplace=True)
+    # v22_freqs = dict(train['v22'].value_counts())
+    # train.loc[:, 'v22'] = [('C%d' % v22_freqs[s]) for s in train['v22'].values]
+
+
+
     train = train.fillna(-977)
+
     print('Generating dummies...')
     for f in train.columns:
         if (train[f].dtype == 'object'):
-            train_dummies = pd.get_dummies(train[f], prefix=f, prefix_sep='_', dummy_na=True).astype(np.int16)
+            newf = f+'_new_f'
+            lbl = preprocessing.LabelEncoder()
+            lbl.fit(list(train[f].values))
+            train[newf] = lbl.transform(list(train[f].values))
+            train = train.drop([f], axis=1)
 
-            columns_train = train_dummies.columns.tolist()  # get the columns
+            # train_dummies = pd.get_dummies(train[f], prefix=f, prefix_sep='_', dummy_na=True).astype(np.int16)
+            # columns_train = train_dummies.columns.tolist()  # get the columns
+            # cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
+            # train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
+            #
+            # train.drop([f], inplace=True, axis=1)
 
-            cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
+    print('creating dummies for v55 and v16')
+    for f in train.columns:
+        new_c = f+'_new_vs_v55'
+        new_c3 = f+'_new_vs_v38'
+        new_c2 = f+'_new_vs_v129'
+        new_c4 = f+'_new_vs_v78'
+        new_c5 = f+'_new_vs_v3'
+        new_c6 = f+'_new_vs_v74'
+        new_c8 = f+'_new_vs_v14'
 
-            train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
+        train[new_c] = train[f]*(train['v38']+train['v55'])
+        train[new_c3] = train[f]*(train['v38']+train['v129'])
+        train[new_c2] = train[f]*(train['v129']+train['v55'])
+        #val-logloss:0.460323
 
-            train.drop([f], inplace=True, axis=1)
+        # train[new_c4] = train[f]*(train['v3_new_f']+train['v74_new_f'])
+        # train[new_c5] = train[f]*(train['v3_new_f']+train['v78'])
+        # train[new_c6] = train[f]*(train['v22']+train['v55'])
+        # train[new_c8] = train[f]*(train['v14']+train['v38'])
 
-
-
-    #print('Generating Polynomial...')
+    #print(train.tail())
+    # print('Generating Polynomial...')
     # etc = ExtraTreesClassifier(n_estimators=150,
     #                            max_features=50,
     #                            criterion='entropy',
@@ -113,44 +173,18 @@ if __name__ == '__main__':
     #                            n_jobs=-1,
     #                            verbose=2)
 
-    # print('fill the nans ...')
-    # train = train.fillna(-977)
-    # rf.fit(train, all_values_full_target)
-    # model = SelectFromModel(rf, prefit=True)
+
+    # etc.fit(train, all_values_full_target)
+    # model = SelectFromModel(etc, prefit=True)
     # train_new = model.transform(train)
     # print('--------- train_new', train_new.shape)
-    # poly = PolynomialFeatures()
+    # poly = PolynomialFeatures(3)
     # train_poly = poly.fit_transform(train_new)
     # train = pd.DataFrame(train_poly)
+    #
     # print('Shape after poly', train.shape)
 
-
-    print('Selecting Features ...')
-
-    p = 80 # 261 features validation_1-auc:0.0.845549
-
-    X_bin = Binarizer().fit_transform(scale(train))
-    selectChi2 = SelectPercentile(chi2, percentile=p).fit(X_bin, all_values_full_target)
-    selectF_classif = SelectPercentile(f_classif, percentile=p).fit(train, all_values_full_target)
-
-    chi2_selected = selectChi2.get_support()
-    chi2_selected_features = [ f for i,f in enumerate(train.columns) if chi2_selected[i]]
-    print('Chi2 selected {} features {}.'.format(chi2_selected.sum(),
-       chi2_selected_features))
-    f_classif_selected = selectF_classif.get_support()
-    f_classif_selected_features = [ f for i,f in enumerate(train.columns) if f_classif_selected[i]]
-    print('F_classif selected {} features {}.'.format(f_classif_selected.sum(),
-       f_classif_selected_features))
-    selected = chi2_selected & f_classif_selected
-    print('Chi2 & F_classif selected {} features'.format(selected.sum()))
-    features = [ f for f,s in zip(train.columns, selected) if s]
-    print (features)
-
-    train = train[features]
-
-    print('Finish feature select', train.shape)
-
-
+    train = train.fillna(-977)
 
     print('Reshaping Train and test ...')
     test = train[shapeTrain:shapeTrain + shapeTest]
@@ -158,8 +192,9 @@ if __name__ == '__main__':
 
     print (train.shape, test.shape)
 
-    # print('fill the nans ...')
-    #
+    features = train.columns.tolist()
+    ceate_feature_map(features)
+
     # for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(), test.iteritems()):
     #     # if train_series.dtype == 'O':
     #     #     #for objects: factorize
@@ -178,25 +213,6 @@ if __name__ == '__main__':
     #     if tmp_len > 0:
     #         test.loc[test_series.isnull(), test_name] = -997
 
-    # p = 75 # 261 features validation_1-auc:0.0.845549
-    #
-    # X_bin = Binarizer().fit_transform(scale(train))
-    # selectChi2 = SelectPercentile(chi2, percentile=p).fit(X_bin, target)
-    # selectF_classif = SelectPercentile(f_classif, percentile=p).fit(train, target)
-    #
-    # chi2_selected = selectChi2.get_support()
-    # chi2_selected_features = [ f for i,f in enumerate(train.columns) if chi2_selected[i]]
-    # print('Chi2 selected {} features {}.'.format(chi2_selected.sum(),
-    #    chi2_selected_features))
-    # f_classif_selected = selectF_classif.get_support()
-    # f_classif_selected_features = [ f for i,f in enumerate(train.columns) if f_classif_selected[i]]
-    # print('F_classif selected {} features {}.'.format(f_classif_selected.sum(),
-    #    f_classif_selected_features))
-    # selected = chi2_selected & f_classif_selected
-    # print('Chi2 & F_classif selected {} features'.format(selected.sum()))
-    # features = [ f for f,s in zip(train.columns, selected) if s]
-    # print (features)
-
     # print('find denominator ...')
     # vs = pd.concat([train, test])
     # for c in num_vars:
@@ -212,7 +228,6 @@ if __name__ == '__main__':
 
 
     ######################################################
-    print (train.shape, test.shape)
     # print ('Normalizing')
     #
     # scaler = StandardScaler()
@@ -234,14 +249,14 @@ if __name__ == '__main__':
     xgval = xgb.DMatrix(X_valid, label=validlabels)
     xgtest = xgb.DMatrix(test)
 
-    ROUNDS = 300
+    ROUNDS = 600
 
     params = {
         'objective': 'binary:logistic',
         'learning_rate': 0.05,
         #'eta':0.05,
         #'n_estimators': 1500,
-        'subsample': 0.9,
+        'subsample': 1,
         'colsample_bytree': 0.4,
         'colsample_bylevel': 0.4,
         'max_depth': 11,
@@ -253,30 +268,44 @@ if __name__ == '__main__':
 
     watchlist = [(xgtrain, 'train'), (xgval, 'val')]
 
-    print('Cross Validation')
-    cv = xgb.cv(params, xgtrain, ROUNDS, nfold=5, metrics={'logloss'}, show_progress=True, as_pandas=True, seed=4242)
-
-    print ('Best Round')
-    print ('__________________________')
-    print (cv['test-logloss-mean'].idxmin(), cv['test-logloss-mean'].min())
-
-    print ('__________________________')
+    # print('Cross Validation')
+    # cv = xgb.cv(params, xgtrain, ROUNDS, nfold=5, metrics={'logloss'}, show_progress=True, as_pandas=True, seed=4242)
+    #
+    # print ('Best Round')
+    # print ('__________________________')
+    # print (cv['test-logloss-mean'].idxmin(), cv['test-logloss-mean'].min())
+    #
+    # print ('__________________________')
+    # print('Training')
+    #
+    #
+    # num_boost_round=cv['test-logloss-mean'].idxmin()
     print('Training')
-
-
-    num_boost_round=cv['test-logloss-mean'].idxmin()
-
-    model = xgb.train(params, xgtrain, num_boost_round, watchlist, early_stopping_rounds=50)
+    model = xgb.train(params, xgtrain, 300, watchlist, early_stopping_rounds=50)
 
     print('Predict')
     y_cv_pred = model.predict(xgval)
     print('CV:', log_loss(validlabels, np.clip(y_cv_pred, 0.01, 0.99)))
-    # CV: 0.46024451001464933 - 0.46287
 
     y_pred = model.predict(xgtest)
 
     pd.DataFrame({"ID": id_test, "PredictedProb": np.clip(y_pred, 0.01, 0.99)}).to_csv('submission_xgb_compact_1.csv',
                                                                                        index=False)
+
+
+    importance = model.get_fscore(fmap='xgb.fmap')
+    importance = sorted(importance.items(), key=operator.itemgetter(1))
+
+    df = pd.DataFrame(importance[:30], columns=['feature', 'fscore'])
+    df['fscore'] = df['fscore'] / df['fscore'].sum()
+
+    plt.figure()
+    df.plot()
+    df.plot(kind='barh', x='feature', y='fscore', legend=False, figsize=(20, 15))
+    plt.title('XGBoost Feature Importance')
+    plt.xlabel('relative importance')
+    plt.gcf().savefig('feature_importance_xgb.png')
+
     #     y_pred = clf.predict_proba(test, ntree_limit=clf.best_iteration)[:, 1]
     #     submission = pd.DataFrame({"ID": id_test, "PredictedProb": y_pred})
     #     submission.to_csv("data/submission_xgb2.csv", index=False)
@@ -304,7 +333,7 @@ if __name__ == '__main__':
     # clf.fit(X_train, y_train, early_stopping_rounds=50, eval_metric="logloss", eval_set=[(X_test, y_test)])
     #
     # #local: 0.467156 | real:  0.46102
-    # #CV: 0.46024451001464933
+    # #CV: 0.463081
     #
     #
     # print('CV: {}'.format(clf.best_score))
