@@ -32,6 +32,7 @@ test = test.drop(high_correlations, axis=1)
 lbl = LabelEncoder()
 lbl.fit(np.unique(list(train.v22.values) + list(test.v22.values)))
 train.v22  = lbl.transform(list(train.v22.values))
+test.v22  = lbl.transform(list(test.v22.values))
 
 features = train.columns.tolist()
 

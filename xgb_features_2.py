@@ -58,7 +58,7 @@ if __name__ == '__main__':
     print('Load data...')
     train = pd.read_csv("data/train.csv")
     test = pd.read_csv("data/test.csv")
-    top_prediction = pd.read_csv("data/top_prediction.csv")
+    top_prediction = pd.read_csv("data/submission_final_xgb.csv")
 
     df_target = train['target']
     target = train['target'].values
@@ -107,9 +107,9 @@ if __name__ == '__main__':
     train['v50'] = train['v50'].fillna(train['v50'].mean())
     train['v55'] = train['v55'].fillna(train['v55'].mean())
     train['v16'] = train['v16'].fillna(train['v16'].mean())
-    # train['v34'] = train['v34'].fillna(train['v34'].mean())
-    # train['v21'] = train['v21'].fillna(train['v21'].mean())
-    # train['v12'] = train['v12'].fillna(train['v12'].mean())
+    #train['v34'] = train['v34'].fillna(train['v34'].mean())
+    #train['v21'] = train['v21'].fillna(train['v21'].mean())
+    #train['v12'] = train['v12'].fillna(train['v12'].mean())
     #train['v38'] = train['v38'].fillna(train['v38'].mean())
     # train['v78'] = train['v78'].fillna(train['v78'].mean())
     #train['v69'] = train['v69'].fillna(train['v69'].mean())
@@ -127,24 +127,19 @@ if __name__ == '__main__':
 
 
     train = train.fillna(-977)
-
-    print('Generating dummies...')
+    encode_columns = []
+    print('Encoding...')
     for f in train.columns:
         if (train[f].dtype == 'object'):
             newf = f+'_new_f'
             lbl = preprocessing.LabelEncoder()
             lbl.fit(list(train[f].values))
             train[newf] = lbl.transform(list(train[f].values))
+            encode_columns.append(newf)
             train = train.drop([f], axis=1)
 
-            # train_dummies = pd.get_dummies(train[f], prefix=f, prefix_sep='_', dummy_na=True).astype(np.int16)
-            # columns_train = train_dummies.columns.tolist()  # get the columns
-            # cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
-            # train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
-            #
-            # train.drop([f], inplace=True, axis=1)
-
-    print('creating dummies for v55 and v16')
+    #train = train.fillna(-977)
+    print('creating dummies for v38 and v55 and v129')
     for f in train.columns:
         new_c = f+'_new_vs_v55'
         new_c3 = f+'_new_vs_v38'
@@ -159,10 +154,21 @@ if __name__ == '__main__':
         train[new_c2] = train[f]*(train['v129']+train['v55'])
         #val-logloss:0.460323
 
-        #train[new_c4] = train[f]*(train['v69']+train['v38'])
-        # train[new_c5] = train[f]*(train['v3_new_f']+train['v78'])
+        train[new_c4] = train[f]*train['v38']+(train[f]*train['v55'])+(train[f]*train['v129'])
+        #train[new_c5] = (train[f]/train['v38'])*(train[f]/train['v55'])*(train[f]/train['v129'])
         # train[new_c6] = train[f]*(train['v22']+train['v55'])
         # train[new_c8] = train[f]*(train['v14']+train['v38'])
+
+
+    print('Dummy time...')
+    for f in train[encode_columns].columns:
+        train_dummies = pd.get_dummies(train[f], prefix=f, prefix_sep='_', dummy_na=True).astype(np.int16)
+        columns_train = train_dummies.columns.tolist()  # get the columns
+        cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
+        train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
+        #
+        train.drop([f], inplace=True, axis=1)
+
 
     #print(train.tail())
     # print('Generating Polynomial...')
@@ -187,6 +193,26 @@ if __name__ == '__main__':
     # print('Shape after poly', train.shape)
 
     train = train.fillna(-977)
+
+    # p = 50
+    #
+    # X_bin = Binarizer().fit_transform(scale(train))
+    # selectChi2 = SelectPercentile(chi2, percentile=p).fit(X_bin, all_values_full_target)
+    # selectF_classif = SelectPercentile(f_classif, percentile=p).fit(train, all_values_full_target)
+    #
+    # chi2_selected = selectChi2.get_support()
+    # chi2_selected_features = [ f for i,f in enumerate(train.columns) if chi2_selected[i]]
+    # print('Chi2 selected {} features {}.'.format(chi2_selected.sum(),
+    #    chi2_selected_features))
+    # f_classif_selected = selectF_classif.get_support()
+    # f_classif_selected_features = [ f for i,f in enumerate(train.columns) if f_classif_selected[i]]
+    # print('F_classif selected {} features {}.'.format(f_classif_selected.sum(),
+    #    f_classif_selected_features))
+    # selected = chi2_selected & f_classif_selected
+    # print('Chi2 & F_classif selected {} features'.format(selected.sum()))
+    # features = [ f for f,s in zip(train.columns, selected) if s]
+    # print (features)
+    # train = train[features]
 
     print('Reshaping Train and test ...')
     test = train[shapeTrain:shapeTrain + shapeTest]
@@ -277,7 +303,7 @@ if __name__ == '__main__':
         }
 
         print('Training', seed)
-        model = xgb.train(params, xgtrain, 300, watchlist, early_stopping_rounds=50)
+        model = xgb.train(params, xgtrain, 3000, watchlist, early_stopping_rounds=100)
         y_cv_pred = model.predict(xgval)
         y_pred = model.predict(xgtest)
 
@@ -311,7 +337,7 @@ if __name__ == '__main__':
     #                                                                                    index=False)
 
     submission = pd.DataFrame({"ID":id_test, "PredictedProb":pred_final})
-    submission.to_csv("submission_bagging_xgb.csv", index=False)
+    submission.to_csv("data/submission_final_xgb.csv", index=False)
 
 
     # importance = model.get_fscore(fmap='xgb.fmap')
