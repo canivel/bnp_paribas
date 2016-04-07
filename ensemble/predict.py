@@ -39,14 +39,14 @@ make_submission(yetc, filepath, 'yetc_3000.csv')
 
 #etc with gini
 etc_gini = ExtraTreesClassifier(n_estimators=3000, max_depth=30, min_samples_leaf=2, verbose=True,
-                           criterion='gini', max_features=0.55, random_state=9527)
+                           criterion='gini', max_features=0.55, random_state=9527, n_jobs=-1)
 etc_gini.fit(X.drop(['target', 'ID'], axis=1), y)
 yetc_gini = etc_gini.predict_proba(tst.drop(['target', 'ID'], axis=1))[:, 1]
 make_submission(yetc_gini, filepath, 'yetc_3000_gini.csv')
 
 #etr
 etr = ExtraTreesRegressor(n_estimators=3000, max_depth=30, min_samples_leaf=2, verbose=True,
-                          criterion='mse', max_features=0.55, random_state=9527)
+                          criterion='mse', max_features=0.55, random_state=9527, n_jobs=-1)
 etr.fit(X.drop(['target', 'ID'], axis=1), y)
 yetr = etr.predict(tst.drop(['target', 'ID'], axis=1))
 make_submission(yetr, filepath, 'yetr_3000.csv')
@@ -57,14 +57,14 @@ make_submission(yetr, filepath, 'yetr_3000.csv')
 '''*****************************************************************'''
 #rfc
 rfc = RandomForestClassifier(n_estimators=1000, max_depth=20, min_samples_leaf=5, verbose=True,
-                             criterion='entropy', max_features=0.5, random_state=9527)
+                             criterion='entropy', max_features=0.5, random_state=9527, n_jobs=-1)
 rfc.fit(X.drop(['target', 'ID'], axis=1), y)
 yrfc = rfc.predict_proba(tst.drop(['target', 'ID'], axis=1))[:, 1]
 make_submission(yrfc, filepath, 'yrfc.csv')
 
 #rfr
 rfr = RandomForestRegressor(n_estimators=1000, max_depth=20, min_samples_leaf=20, verbose=True,
-                            criterion='mse', max_features=0.5, random_state=9527)
+                            criterion='mse', max_features=0.5, random_state=9527, n_jobs=-1)
 rfr.fit(X.drop(['target', 'ID'], axis=1), y)
 yrfr = rfr.predict(tst.drop(['target', 'ID'], axis=1))
 make_submission(yrfr, filepath, 'yrfr.csv')
@@ -75,14 +75,14 @@ make_submission(yrfr, filepath, 'yrfr.csv')
 '''*****************************************************************'''
 #gbc
 gbc = XGBClassifier(n_estimators=1100, max_depth=10, min_child_weight=2, learning_rate=0.01, 
-                    silent=False, subsample=0.85, colsample_bytree=0.5, base_score=0.76, seed=9527)
+                    silent=False, subsample=0.85, colsample_bytree=0.5, base_score=0.76, seed=9527, nthread=4)
 gbc.fit(X.drop(['target', 'ID'], axis=1), y)
 ygbc = gbc.predict_proba(tst.drop(['target', 'ID'], axis=1))[:, 1]
 make_submission(ygbc, filepath, 'ygbc_1100.csv')
 
 #gbr
 gbr = XGBRegressor(n_estimators=1100, max_depth=10, min_child_weight=2, learning_rate=0.01, 
-                   silent=False, subsample=0.85, colsample_bytree=0.5, base_score=0.76, seed=9527)
+                   silent=False, subsample=0.85, colsample_bytree=0.5, base_score=0.76, seed=9527, nthread=4)
 gbr.fit(X.drop(['target', 'ID'], axis=1), y)
 ygbr = gbr.predict(tst.drop(['target', 'ID'], axis=1))
 make_submission(ygbr, filepath, 'ygbr.csv')
