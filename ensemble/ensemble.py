@@ -100,10 +100,5 @@ strong_models.to_csv(os.path.join(pathe, 'strong_models.csv'))
 strong_ensemble.to_csv(os.path.join(pathe, 'strong_ensemble.csv'))
 
 
-'''at last, the strong ensemble get logloss=0.45072 on the leaderboard'''
-'''and this score can be improved if squeeze more'''
-''''''
-
-
 
 
