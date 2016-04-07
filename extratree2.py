@@ -1,187 +1,122 @@
-__author__ = 'canivel'
-import pandas as pd
+#scikit learn ensembe workflow for binary probability
+import time; start_time = time.time()
 import numpy as np
-import csv
-from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import ExtraTreesClassifier, AdaBoostClassifier, RandomForestClassifier, VotingClassifier
-from sklearn.grid_search import GridSearchCV
-from sklearn.feature_selection import VarianceThreshold
+import pandas as pd
 from sklearn import ensemble
-from sklearn.metrics import log_loss
-from sklearn.cross_validation import train_test_split, cross_val_score
+import xgboost as xgb
+from sklearn.metrics import log_loss, make_scorer
+from sklearn.grid_search import GridSearchCV
+from sklearn.cross_validation import train_test_split
+import random; random.seed(2016)
+
+train = pd.read_csv('data/train.csv')
+test = pd.read_csv('data/test.csv')
+num_train = train.shape[0]
+
+y_train = train['target']
+train = train.drop(['target'],axis=1)
+id_test = test['ID']
+
+def fill_nan_null(val):
+    ret_fill_nan_null = 0.0
+    if val == True:
+        ret_fill_nan_null = 1.0
+    return ret_fill_nan_null
+
+df_all = pd.concat((train, test), axis=0, ignore_index=True)
+df_all['null_count'] = df_all.isnull().sum(axis=1).tolist()
+df_all_temp = df_all['ID']
+df_all = df_all.drop(['ID'],axis=1)
+df_data_types = df_all.dtypes[:] #{'object':0,'int64':0,'float64':0,'datetime64':0}
+d_col_drops = []
+
+for i in range(len(df_data_types)):
+    df_all[str(df_data_types.index[i])+'_nan_'] = df_all[str(df_data_types.index[i])].map(lambda x:fill_nan_null(pd.isnull(x)))
+df_all = df_all.fillna(-9999)
+#df_all = df_all.replace(0, -9999)
+
+for i in range(len(df_data_types)):
+    if str(df_data_types[i])=='object':
+        df_u = pd.unique(df_all[str(df_data_types.index[i])].ravel())
+        print("Column: ", str(df_data_types.index[i]), " Length: ", len(df_u))
+        d={}
+        j = 1000
+        for s in df_u:
+            d[str(s)]=j
+            j+=5
+        df_all[str(df_data_types.index[i])+'_vect_'] = df_all[str(df_data_types.index[i])].map(lambda x:d[str(x)])
+        d_col_drops.append(str(df_data_types.index[i]))
+        if len(df_u)<150:
+            dummies = pd.get_dummies(df_all[str(df_data_types.index[i])]).rename(columns=lambda x: str(df_data_types.index[i]) + '_' + str(x))
+            df_all_temp = pd.concat([df_all_temp, dummies], axis=1)
+
+df_all_temp = df_all_temp.drop(['ID'],axis=1)
+df_all = pd.concat([df_all, df_all_temp], axis=1)
+print(len(df_all), len(df_all.columns))
+#df_all.to_csv("df_all.csv")
+train = df_all.iloc[:num_train]
+test = df_all.iloc[num_train:]
+train = train.drop(d_col_drops,axis=1)
+test = test.drop(d_col_drops,axis=1)
+
+def flog_loss(ground_truth, predictions):
+    flog_loss_ = log_loss(ground_truth, predictions) #, eps=1e-15, normalize=True, sample_weight=None)
+    return flog_loss_
+LL  = make_scorer(flog_loss, greater_is_better=False)
+
+g={'ne':150,'md':6,'mf':80,'rs':2016} #change to g={'ne':500,'md':40,'mf':60,'rs':2016}
+etc = ensemble.ExtraTreesClassifier(n_estimators=g['ne'], max_depth=g['md'], max_features=g['mf'], random_state=g['rs'], criterion='entropy', min_samples_split= 4, min_samples_leaf= 2, verbose = 0, n_jobs =-1)      
+etr = ensemble.ExtraTreesRegressor(n_estimators=g['ne'], max_depth=g['md'], max_features=g['mf'], random_state=g['rs'], min_samples_split= 4, min_samples_leaf= 2, verbose = 0, n_jobs =-1)      
+rfc = ensemble.RandomForestClassifier(n_estimators=g['ne'], max_depth=g['md'], max_features=g['mf'], random_state=g['rs'], criterion='entropy', min_samples_split= 4, min_samples_leaf= 2, verbose = 0, n_jobs =-1)
+rfr = ensemble.RandomForestRegressor(n_estimators=g['ne'], max_depth=g['md'], max_features=g['mf'], random_state=g['rs'], min_samples_split= 4, min_samples_leaf= 2, verbose = 0, n_jobs =-1)
+xgr = xgb.XGBRegressor(n_estimators=g['ne'], max_depth=g['md'], seed=g['rs'], missing=np.nan, learning_rate=0.02, subsample=0.9, colsample_bytree=0.85, objective='reg:linear')
+xgc = xgb.XGBClassifier(n_estimators=g['ne'], max_depth=g['md'], seed=g['rs'], missing=np.nan, learning_rate=0.02, subsample=0.9, colsample_bytree=0.85, objective='binary:logistic') #try 'binary:logitraw'
+#clf = {'etc':etc, 'etr':etr, 'rfc':rfc, 'rfr':rfr, 'xgr':xgr, 'xgc':xgc} # use this line instead
+clf = {'etr':etr, 'rfr':rfr, 'xgr':xgr} # removed due to kaggle performance, would prefer less time and more cores than more time and less cores :)
+
+y_pred=[]
+best_score = 0.0
+id_results = id_test[:]
+for c in clf:
+    if c[:1] != "x": #not xgb
+        model = GridSearchCV(estimator=clf[c], param_grid={}, n_jobs =-1, cv=2, verbose=0, scoring=LL)
+        model.fit(train, y_train.values)
+        if c[-1:] != "c": #not classifier
+            y_pred = model.predict(test)
+            print("Ensemble Model: ", c, " Best CV score: ", model.best_score_, " Time: ", round(((time.time() - start_time)/60),2))
+        else: #classifier
+            best_score = (log_loss(y_train.values, model.predict_proba(train)))*-1
+            y_pred = model.predict_proba(test)[:,1]
+            print("Ensemble Model: ", c, " Best CV score: ", best_score, " Time: ", round(((time.time() - start_time)/60),2))
+    else: #xgb
+        X_fit, X_eval, y_fit, y_eval= train_test_split(train, y_train, test_size=0.35, train_size=0.65, random_state=g['rs'])
+        model = clf[c]
+        model.fit(X_fit, y_fit.values, early_stopping_rounds=20, eval_metric="logloss", eval_set=[(X_eval, y_eval)], verbose=0)
+        if c == "xgr": #xgb regressor
+            best_score = (log_loss(y_train.values, model.predict(train)))*-1
+            y_pred = model.predict(test)
+        else: #xgb classifier
+            best_score = (log_loss(y_train.values, model.predict_proba(train)))*-1
+            y_pred = model.predict_proba(test)[:,1]
+        print("Ensemble Model: ", c, " Best CV score: ", best_score, " Time: ", round(((time.time() - start_time)/60),2))
+
+    for i in range(len(y_pred)):
+        if y_pred[i]<0.0:
+            y_pred[i] = 0.0
+        if y_pred[i]>1.0:
+            y_pred[i] = 1.0
+
+    df_in = pd.DataFrame({"ID": id_test, c: y_pred})
+    id_results = pd.concat([id_results, df_in[c]], axis=1)
 
 
-def find_denominator(df, col):
-    """
-    Function that trying to find an approximate denominator used for scaling.
-    So we can undo the feature scaling.
-    """
-    vals = df[col].dropna().sort_values().round(8)
-    vals = pd.rolling_apply(vals, 2, lambda x: x[1] - x[0])
-    vals = vals[vals > 0.000001]
-    return vals.value_counts().idxmax()
-
-def predict(clf, train, target, test, score, id_test):
-    clf.fit(train, target)
-    print('-----------------------')
-
-    print('Predict...')
-    y_pred = clf.predict_proba(test)
-    # print y_pred
-
-    df = pd.DataFrame({"ID": id_test, "PredictedProb": y_pred[:, 1]})
-    df.to_csv('data/submission_stackin_rf_extra_tree_{}.csv'.format(score), index=False)
-
-if __name__ == '__main__':
-    print('Load data...')
-    train = pd.read_csv("data/train.csv")
-    test = pd.read_csv("data/test.csv")
-
-    target = train['target'].values
-    # train = train[['v3', 'v10', 'v12', 'v14', 'v21', 'v22', 'v24', 'v30', 'v31', 'v34', 'v38', 'v40', 'v47',
-    #                'v50', 'v52', 'v56', 'v62', 'v66', 'v71', 'v72', 'v74', 'v75', 'v79', 'v91', 'v107', 'v110',
-    #                'v112', 'v113', 'v114', 'v125', 'v129']]
-
-    id_test = test['ID'].values
-    # test = test[['v3', 'v10', 'v12', 'v14', 'v21', 'v22', 'v24', 'v30', 'v31', 'v34', 'v38', 'v40', 'v47', 'v50',
-    #              'v52', 'v56', 'v62', 'v66', 'v71', 'v72', 'v74', 'v75', 'v79', 'v91', 'v107', 'v110', 'v112',
-    #              'v113', 'v114', 'v125', 'v129']]
-
-    high_correlations = [
-        'v8', 'v23', 'v25', 'v31', 'v36', 'v37', 'v46', 'v51', 'v53', 'v54', 'v63', 'v73', 'v75', 'v79', 'v81', 'v82', 'v89', 'v92',
-        'v95', 'v105', 'v107', 'v108', 'v109', 'v110', 'v116', 'v117', 'v118', 'v119', 'v123', 'v124', 'v128'
-    ]
-
-    num_vars = ['v1', 'v2', 'v4', 'v5', 'v6', 'v7', 'v9', 'v10', 'v11',
-                'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20',
-                'v21', 'v26', 'v27', 'v28', 'v29', 'v32', 'v33', 'v34', 'v35', 'v38',
-                'v39', 'v40', 'v41', 'v42', 'v43', 'v44', 'v45', 'v48', 'v49', 'v50',
-                'v55', 'v57', 'v58', 'v59', 'v60', 'v61', 'v62', 'v64', 'v65', 'v67',
-                'v68', 'v69', 'v70', 'v72', 'v76', 'v77', 'v78', 'v80', 'v83', 'v84',
-                'v85', 'v86', 'v87', 'v88', 'v90', 'v93', 'v94', 'v96', 'v97', 'v98',
-                'v99', 'v100', 'v101', 'v102', 'v103', 'v104', 'v106', 'v111', 'v114',
-                'v115', 'v120', 'v121', 'v122', 'v126', 'v127', 'v129', 'v130', 'v131']
-
-    train = train.drop(['ID', 'target'], axis=1)
-    train = train.drop(high_correlations, axis=1)
-
-    test = test.drop(['ID'], axis=1)
-    test = test.drop(high_correlations, axis=1)
-
-    print('Clearing...')
-    vs = pd.concat([train, test])
-    for c in num_vars:
-        if c not in train.columns:
-            continue
-
-        train.loc[train[c].round(5) == 0, c] = 0
-        test.loc[test[c].round(5) == 0, c] = 0
-
-        denominator = find_denominator(vs, c)
-        train[c] *= 1/denominator
-        test[c] *= 1/denominator
-
-    for (train_name, train_series), (test_name, test_series) in zip(train.iteritems(),test.iteritems()):
-        if train_series.dtype == 'O':
-            #for objects: factorize
-            train[train_name], tmp_indexer = pd.factorize(train[train_name])
-            test[test_name] = tmp_indexer.get_indexer(test[test_name])
-            #but now we have -1 values (NaN)
-        else:
-            #for int or float: fill NaN
-            tmp_len = len(train[train_series.isnull()])
-            if tmp_len>0:
-                #print "mean", train_series.mean()
-                train.loc[train_series.isnull(), train_name] = -999
-            #and Test
-            tmp_len = len(test[test_series.isnull()])
-            if tmp_len>0:
-                test.loc[test_series.isnull(), test_name] = -999
-
-    for f in train.columns:
-        if train[f].dtype == 'object':
-            lbl = preprocessing.LabelEncoder()
-            lbl.fit(list(train[f].values))
-            train[f] = lbl.transform(list(train[f].values))
-
-    print('Training...')
-
-    X_train, X_test, y_train, y_test = train_test_split(train, target, random_state=1301, stratify=target, test_size=0.3)
-
-    #0.46176
-    # -----------------------
-    #   logloss train: 0.46203
-    # -----------------------
-
-    # ext = ExtraTreesClassifier(n_estimators=400,
-    #                            max_features=30,
-    #                            criterion='entropy',
-    #                            min_samples_split=2,
-    #                            max_depth=30,
-    #                            min_samples_leaf=2,
-    #                            n_jobs=4,
-    #                            verbose=1,
-    #                            warm_start=True
-    #                            )
-
-    et1 = ExtraTreesClassifier(n_estimators=1000,
-                               max_features=50,
-                               criterion='entropy',
-                               min_samples_split=4,
-                               max_depth=35,
-                               min_samples_leaf=2,
-                               verbose=2,
-                               n_jobs=-1)
-
-
-
-    rf1 = RandomForestClassifier(bootstrap=True,
-                                 criterion='entropy',
-                                 min_samples_split=4,
-                                 min_samples_leaf=2,
-                                 max_features=50,
-                                 max_depth=35,
-                                 n_estimators=1000,
-                                 n_jobs=4,
-                                 oob_score=False,
-                                 random_state=1301,
-                                 verbose=2)
-
-    # param_grid = {
-    #     'n_estimators': [10],
-    #     'max_features': ['auto', 2, 30],
-    #     'min_samples_leaf': [2, 8],
-    #     'max_leaf_nodes': [2, 8],
-    #     'min_samples_split': [2, 5],
-    #     'max_depth': [5, 20, 40],
-    #     'criterion': ['entropy', 'gini'],
-    # }
-
-
-    clfs = [('et1', et1), ('rf1', rf1)]
-    # set up ensemble of rf_1 and rf_2
-    clf = VotingClassifier(estimators=clfs, voting='soft', weights=[1, 1])
-
-    # clf = GridSearchCV(estimator=ext, param_grid=param_grid, cv= 5, scoring='log_loss', verbose=1)
-
-    # ('Raw LogLoss score:', -0.50747886759686722)
-    # criterion: 'gini'
-    # max_depth: 40
-    # max_features: 30
-    # max_leaf_nodes: 8
-    # min_samples_leaf: 8
-    # min_samples_split: 5
-    # n_estimators: 10
-    # best_parameters, score, _ = max(clf.grid_scores_, key=lambda x: x[1])
-    # print('Raw LogLoss score:', score)
-    # for param_name in sorted(best_parameters.keys()):
-    #     print("%s: %r" % (param_name, best_parameters[param_name]))
-
-    clf.fit(X_train, y_train)
-    clf_probs = clf.predict_proba(X_test)
-    score = log_loss(y_test, clf_probs)
-
-    print('logloss Score: %.5f' % score)
-
-    if (score < 0.46):
-        predict(clf, train, target, test, score, id_test)
+id_results['avg'] = id_results.drop('ID', axis=1).apply(np.average, axis=1)
+id_results['min'] = id_results.drop('ID', axis=1).apply(min, axis=1)
+id_results['max'] = id_results.drop('ID', axis=1).apply(max, axis=1)
+id_results['diff'] = id_results['max'] - id_results['min']
+for i in range(10):
+    print(i, len(id_results[id_results['diff']>(i/10)]))
+id_results.to_csv("results_analysis.csv", index=False)
+ds = id_results[['ID','avg']]
+ds.columns = ['ID','PredictedProb']
+ds.to_csv('data/extratree2_1.csv',index=False)

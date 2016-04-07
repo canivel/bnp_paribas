@@ -4,12 +4,13 @@ import pandas as pd
 import numpy as np
 import csv
 from sklearn.tree import DecisionTreeClassifier
-from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.ensemble import ExtraTreesClassifier, ExtraTreesRegressor, VotingClassifier
+from sklearn.grid_search import GridSearchCV
 from sklearn import ensemble
 from sklearn.metrics import log_loss, make_scorer
 from sklearn import cross_validation
 from sklearn import preprocessing
-
+from sklearn.feature_selection import SelectFromModel
 
 def find_denominator(df, col):
     """
@@ -38,27 +39,34 @@ def az_to_int(az, nanVal=None):
 print('Load data...')
 train = pd.read_csv("data/train.csv")
 target = train['target'].values
-train = train.drop(
-    ['ID', 'target', 'v8', 'v23', 'v25', 'v31', 'v36', 'v37', 'v46', 'v51', 'v53', 'v54', 'v63', 'v73', 'v75', 'v79',
-     'v81', 'v82', 'v89', 'v92', 'v95', 'v105', 'v107', 'v108', 'v109', 'v110', 'v116', 'v117', 'v118', 'v119', 'v123',
-     'v124', 'v128'], axis=1)
+train = train.drop(['ID', 'target'], axis=1)
 test = pd.read_csv("data/test.csv")
 id_test = test['ID'].values
-test = test.drop(
-    ['ID', 'v8', 'v23', 'v25', 'v31', 'v36', 'v37', 'v46', 'v51', 'v53', 'v54', 'v63', 'v73', 'v75', 'v79', 'v81',
-     'v82', 'v89', 'v92', 'v95', 'v105', 'v107', 'v108', 'v109', 'v110', 'v116', 'v117', 'v118', 'v119', 'v123', 'v124',
-     'v128'], axis=1)
+df_id_test = test['ID']
+test = test.drop(['ID'], axis=1)
+
+tokeep = ['v3', 'v10', 'v12', 'v14', 'v16', 'v21', 'v22', 'v24',
+              'v30', 'v31', 'v34', 'v38', 'v40', 'v47',
+              'v50', 'v52', 'v55', 'v56', 'v62', 'v66',
+              'v71', 'v72', 'v74', 'v75', 'v79', 'v91',  # 'v107',
+              'v112', 'v113', 'v114', 'v125', 'v129']
+
+features = train.columns
+todrop = list(set(features).difference(tokeep))
+train.drop(todrop, inplace=True, axis=1)
+test.drop(todrop, inplace=True, axis=1)
 
 print('Clearing...')
-num_vars = ['v1', 'v2', 'v4', 'v5', 'v6', 'v7', 'v9', 'v10', 'v11',
-            'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20',
-            'v21', 'v26', 'v27', 'v28', 'v29', 'v32', 'v33', 'v34', 'v35', 'v38',
-            'v39', 'v40', 'v41', 'v42', 'v43', 'v44', 'v45', 'v48', 'v49', 'v50',
-            'v55', 'v57', 'v58', 'v59', 'v60', 'v61', 'v62', 'v64', 'v65', 'v67',
-            'v68', 'v69', 'v70', 'v72', 'v76', 'v77', 'v78', 'v80', 'v83', 'v84',
-            'v85', 'v86', 'v87', 'v88', 'v90', 'v93', 'v94', 'v96', 'v97', 'v98',
-            'v99', 'v100', 'v101', 'v102', 'v103', 'v104', 'v106', 'v111', 'v114',
-            'v115', 'v120', 'v121', 'v122', 'v126', 'v127', 'v129', 'v130', 'v131']
+num_vars = ['v10', 'v12', 'v14', 'v16', 'v21', 'v34', 'v38','v40', 'v50', 'v55', 'v62', 'v72', 'v129']
+# num_vars = ['v1', 'v2', 'v4', 'v5', 'v6', 'v7', 'v9', 'v10', 'v11',
+#             'v12', 'v13', 'v14', 'v15', 'v16', 'v17', 'v18', 'v19', 'v20',
+#             'v21', 'v26', 'v27', 'v28', 'v29', 'v32', 'v33', 'v34', 'v35', 'v38',
+#             'v39', 'v40', 'v41', 'v42', 'v43', 'v44', 'v45', 'v48', 'v49', 'v50',
+#             'v55', 'v57', 'v58', 'v59', 'v60', 'v61', 'v62', 'v64', 'v65', 'v67',
+#             'v68', 'v69', 'v70', 'v72', 'v76', 'v77', 'v78', 'v80', 'v83', 'v84',
+#             'v85', 'v86', 'v87', 'v88', 'v90', 'v93', 'v94', 'v96', 'v97', 'v98',
+#             'v99', 'v100', 'v101', 'v102', 'v103', 'v104', 'v106', 'v111', 'v114',
+#             'v115', 'v120', 'v121', 'v122', 'v126', 'v127', 'v129', 'v130', 'v131']
 
 train['v22'] = train['v22'].fillna('ZZZZZ')
 test['v22'] = test['v22'].fillna('ZZZZZ')
@@ -140,20 +148,81 @@ scaler = preprocessing.StandardScaler()
 train = scaler.fit_transform(train)
 test = scaler.fit_transform(test)
 
-X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, target, random_state=1301, test_size=0.3)
-
+g={'ne':100,'md':40,'mf':40,'rs':2017}
 print('Training...')
-extc = ExtraTreesClassifier(n_estimators=100,
-                            max_features=50,
+etc = ExtraTreesClassifier(n_estimators=g['ne'],
+                            #max_features=50,
                             criterion='entropy',
                             min_samples_split=4,
-                            max_depth=35,
+                            max_depth=g['md'],
+                            random_state=g['rs'],
                             min_samples_leaf=2,
                             warm_start=True,
                             n_jobs=-1)
+
+etr = ExtraTreesRegressor(n_estimators=g['ne'],
+                          max_depth=g['md'],
+                          #max_features=40,
+                          random_state=g['rs'],
+                          min_samples_split= 4,
+                          min_samples_leaf= 2,
+                          verbose = 0,
+                          n_jobs =-1)
+
+# clfs = [('etc', etc), ('etr', etr)]
+# clf = VotingClassifier(clfs, voting='soft', weights=[1, 1])
 # score = log_loss(y_test, extc.predict_proba(X_test)[:, 1])
-scores = cross_validation.cross_val_score(extc, X_train, y_train, scoring='log_loss', cv=5, verbose=2)
-print(scores.mean())
+X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, target, random_state=2017, test_size=0.3)
+# scores = cross_validation.cross_val_score(clf, X_train, y_train, scoring='log_loss', cv=5, verbose=2)
+# print(scores.mean())
+
+clf = {'etc':etc, 'etr':etr}
+
+def flog_loss(ground_truth, predictions):
+    flog_loss_ = log_loss(ground_truth, predictions) #, eps=1e-15, normalize=True, sample_weight=None)
+    return flog_loss_
+
+LL = make_scorer(flog_loss, greater_is_better=False)
+
+
+y_pred=[]
+best_score = 0.0
+id_results = df_id_test[:]
+for c in clf:
+    model = GridSearchCV(estimator=clf[c], param_grid={}, n_jobs=-1, cv=2, verbose=1, scoring=LL)
+    model.fit(train, target)
+    if c[-1:] != "c":  # not classifier
+        y_pred = model.predict(test)
+        print("Ensemble Model: ", c, " Best CV score: ", model.best_score_)
+    else:  # classifier
+        # best_score = (log_loss(target, model.predict_proba(train))) * -1
+        # scores = cross_validation.cross_val_score(etc, X_train, y_train, scoring='log_loss', cv=5, verbose=1)
+        # best_score = scores.mean()
+        y_pred = model.predict_proba(test)[:, 1]
+        #print("Ensemble Model: ", c, " Best CV score: ", best_score)
+
+    for i in range(len(y_pred)):
+        if y_pred[i]<0.0:
+            y_pred[i] = 0.0
+        if y_pred[i]>1.0:
+            y_pred[i] = 1.0
+
+    df_in = pd.DataFrame({"ID": df_id_test, c: y_pred})
+    id_results = pd.concat([id_results, df_in[c]], axis=1)
+
+
+id_results['avg'] = id_results.drop('ID', axis=1).apply(np.average, axis=1)
+id_results['min'] = id_results.drop('ID', axis=1).apply(min, axis=1)
+id_results['max'] = id_results.drop('ID', axis=1).apply(max, axis=1)
+id_results['diff'] = id_results['max'] - id_results['min']
+
+for i in range(10):
+    print(i, len(id_results[id_results['diff']>(i/10)]))
+
+id_results.to_csv("results_analysis.csv", index=False)
+ds = id_results[['ID','avg']]
+ds.columns = ['ID','PredictedProb']
+ds.to_csv('data/extratree3_3.csv',index=False)
 
 # extc.fit(train, target)
 # print('Predict...')

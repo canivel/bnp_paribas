@@ -124,9 +124,9 @@ if __name__ == '__main__':
     # v22_freqs = dict(train['v22'].value_counts())
     # train.loc[:, 'v22'] = [('C%d' % v22_freqs[s]) for s in train['v22'].values]
 
+    train['v50'] = train['v50'] ** 0.125
 
-
-    train = train.fillna(-977)
+    train = train.fillna(-9999)
     encode_columns = []
     print('Encoding...')
     for f in train.columns:
@@ -137,6 +137,17 @@ if __name__ == '__main__':
             train[newf] = lbl.transform(list(train[f].values))
             encode_columns.append(newf)
             train = train.drop([f], axis=1)
+
+
+    print('Dummy time...')
+    for f in train[encode_columns].columns:
+        train_dummies = pd.get_dummies(train[f], prefix=f, prefix_sep='_', dummy_na=True).astype(np.int16)
+        columns_train = train_dummies.columns.tolist()  # get the columns
+        cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
+        train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
+        #
+        train.drop([f], inplace=True, axis=1)
+
 
     #train = train.fillna(-977)
     print('creating dummies for v38 and v55 and v129')
@@ -160,14 +171,6 @@ if __name__ == '__main__':
         # train[new_c8] = train[f]*(train['v14']+train['v38'])
 
 
-    print('Dummy time...')
-    for f in train[encode_columns].columns:
-        train_dummies = pd.get_dummies(train[f], prefix=f, prefix_sep='_', dummy_na=True).astype(np.int16)
-        columns_train = train_dummies.columns.tolist()  # get the columns
-        cols_to_use_train = columns_train[:len(columns_train) - 1]  # drop the last one
-        train = pd.concat([train, train_dummies[cols_to_use_train]], axis=1)
-        #
-        train.drop([f], inplace=True, axis=1)
 
 
     #print(train.tail())
@@ -192,7 +195,7 @@ if __name__ == '__main__':
     #
     # print('Shape after poly', train.shape)
 
-    train = train.fillna(-977)
+    train = train.fillna(-9999)
 
     # p = 50
     #
@@ -329,7 +332,7 @@ if __name__ == '__main__':
     # y_cv_pred = model.predict(xgval)
     pred_eval = np.mean(np.array(yevalpred_list), axis = 0)
     print('CV:', log_loss(validlabels, np.clip(pred_eval, 0.01, 0.99)))
-
+    #('CV:', 0.45882495188313527) >>>> 0.46259 ....
     # y_pred = model.predict(xgtest)
     pred_final = np.mean(np.array(ypred_list), axis = 0)
 
