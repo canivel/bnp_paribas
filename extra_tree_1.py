@@ -1,4 +1,3 @@
-# Based on : https://www.kaggle.com/chabir/bnp-paribas-cardif-claims-management/extratreesclassifier-score-0-45-v5/code
 import pandas as pd
 import time
 import numpy as np
