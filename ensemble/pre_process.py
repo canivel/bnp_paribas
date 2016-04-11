@@ -16,6 +16,8 @@ data_info = pd.read_csv('data/data_info.csv', index_col=0)
 groupc = eval(data_info.loc['groupc', 'info'])
 
 
+tot['nNAN'] = tot.isnull().sum(axis=1)
+
 '''*****************************************************************'''
 '''************create a catfeats-based logistic feature*************'''
 '''*****************************************************************'''
@@ -36,7 +38,6 @@ logit = LogisticRegression(C=10, solver='lbfgs', max_iter=300)
 logit.fit(xoh, y)
 logit_feat = logit.predict_log_proba(oh)[:, 1]
 tot['logit_feat'] = logit_feat
-
 
 '''*****************************************************************'''
 '''****************************factorize****************************'''
@@ -59,8 +60,9 @@ tot = tot.fillna(-9999)
 tot.drop(['v8', 'v25', 'v46', 'v54', 'v63', 'v89'], axis=1, inplace=True) #group1 feats
 tot.drop(['v107', 'v79', 'v75', 'v110'], axis=1, inplace=True) #cat feats
 
-
 '''*****************************************************************'''
 '''*****************************output******************************'''
 '''*****************************************************************'''
-tot.to_csv('data/tot.csv', index=False)
+tot.to_csv('data/new_train.csv', index=False)
+
+print tot.head()

@@ -6,7 +6,7 @@ import os
 '''***************************predefined****************************'''
 '''*****************************************************************'''
 path1 = 'output/param_1'
-path2 = 'output/param_2'
+path2 = '../data'
 pathe = 'output/ensemble'
 tst_ID = pd.read_csv('data/tst_ID.csv')['ID'].values
 
@@ -20,27 +20,25 @@ def make_submission(proba, filepath, filename, ID=tst_ID):
 '''the best one get about 0.4584 on leaderboard'''
 '''but most of the log loss are greater than 0.4610'''
 ygbc_1100 = pd.read_csv(os.path.join(path1, 'ygbc_1100.csv')).ix[:, 1]
-yrfc_1100 = pd.read_csv(os.path.join(path1, 'yrfc_1000.csv')).ix[:, 1]
-yet = pd.read_csv(os.path.join(path2, 'yet.csv')).ix[:, 1]
-yet2 = pd.read_csv(os.path.join(path2, 'yet2.csv')).ix[:, 1]
-yetr = pd.read_csv(os.path.join(path2, 'yetr.csv')).ix[:, 1]
-yetr2 = pd.read_csv(os.path.join(path2, 'yetr2.csv')).ix[:, 1]
-yrf = pd.read_csv(os.path.join(path2, 'yrf.csv')).ix[:, 1]
-yrfr = pd.read_csv(os.path.join(path2, 'yrfr.csv')).ix[:, 1]
-yxgbc = pd.read_csv(os.path.join(path2, 'yxgbc.csv')).ix[:, 1]
-yxgbr = pd.read_csv(os.path.join(path2, 'yxgbr.csv')).ix[:, 1]
+yrfc_1100 = pd.read_csv(os.path.join(path1, 'yrfc.csv')).ix[:, 1]
+yrfr = pd.read_csv(os.path.join(path1, 'yrfr.csv')).ix[:, 1]
+
+yet_16 = pd.read_csv(os.path.join(path2, 'extra_trees_1_6.csv')).ix[:, 1]
+yet_32 = pd.read_csv(os.path.join(path2, 'extra_trees_v3_2.csv')).ix[:, 1]
+yet_33 = pd.read_csv(os.path.join(path2, 'extra_trees_v3_3.csv')).ix[:, 1]
+yf_xgb = pd.read_csv(os.path.join(path2, 'submission_final_xgb.csv')).ix[:, 1]
+ygram = pd.read_csv(os.path.join(path2, 'tgrammat_submission.csv')).ix[:, 1]
+
 #gather weak models
-weak_models = pd.DataFrame(index=yet.index)
+weak_models = pd.DataFrame(index=yet_16.index)
 weak_models['ygbc_1100'] = ygbc_1100
 weak_models['yrfc_1100'] = yrfc_1100
-weak_models['yet'] = yet
-weak_models['yetr'] = yetr
-weak_models['yet2'] = yet2
-weak_models['yetr2'] = yetr2
-weak_models['yrf'] = yrf
 weak_models['yrfr'] = yrfr
-weak_models['yxgbc'] = yxgbc
-weak_models['yxgbr'] = yxgbr
+weak_models['yet_16'] = yet_16
+weak_models['yet_32'] = yet_32
+weak_models['yet_33'] = yet_33
+weak_models['ygram'] = ygram
+
 #compute some info
 weak_models_info = pd.DataFrame(index=weak_models.index)
 weak_models_info['avg'] = weak_models.mean(axis=1)
@@ -70,11 +68,21 @@ weak_ensemble.to_csv(os.path.join(pathe, 'weak_ensemble.csv'))
 '''yetc can reach 0.4528 on leadboard'''
 '''yet4 & weak_ensemble can get 0.4550'''
 yetc_3000 = pd.read_csv(os.path.join(path1, 'yetc_3000.csv')).ix[:, 1]
-yet4 = pd.read_csv(os.path.join(path2, 'yet4.csv')).ix[:, 1]
+ytop_predicition = pd.read_csv(os.path.join(path2, 'top_prediction.csv')).ix[:, 1]
+yet_14 = pd.read_csv(os.path.join(path2, 'extra_trees_1_4.csv')).ix[:, 1]
+yet_15 = pd.read_csv(os.path.join(path2, 'extra_trees_1_5.csv')).ix[:, 1]
+yet_45= pd.read_csv(os.path.join(path2, 'extra_trees_045.csv')).ix[:, 1]
+yet_17 = pd.read_csv(os.path.join(path2, 'extra_trees_1_7.csv')).ix[:, 1]
+
+
 #gather strong models
-strong_models = pd.DataFrame(index=yet4.index)
+strong_models = pd.DataFrame(index=yet_17.index)
 strong_models['yetc_3000'] = yetc_3000
-strong_models['yet4'] = yet4
+strong_models['ytop_predicition'] = ytop_predicition
+strong_models['yet_14'] = yet_14
+strong_models['yet_15'] = yet_15
+strong_models['yet_45'] = yet_45
+strong_models['yet_17'] = yet_17
 strong_models['weak_ensemble'] = weak_ensemble
 #compute some info
 strong_models_info = pd.DataFrame(index=strong_models.index)
@@ -100,5 +108,7 @@ strong_models.to_csv(os.path.join(pathe, 'strong_models.csv'))
 strong_ensemble.to_csv(os.path.join(pathe, 'strong_ensemble.csv'))
 
 
-
-
+'''at last, the strong ensemble get logloss=0.45072 on the leaderboard'''
+'''and this score can be improved if squeeze more'''
+''''''
+make_submission(strong_ensemble, pathe, 'sub_models1.csv')
