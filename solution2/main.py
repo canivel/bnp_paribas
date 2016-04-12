@@ -37,20 +37,24 @@ if __name__ == '__main__':
     print(pred1)
     #pred2 = np.zeros((num_tests, num_classes)).astype(np.float32)
 
+    seeds = [2017, 3249, 5705, 5310, 6271, 1430, 4102, 9071, 6855, 9313, 7516, 8512, 8044, 3383, 777,
+             5540, 9313, 9266, 5759, 873, 9216, 6743, 9330, 8479, 2195, 939, 4817, 6938, 6356, 4312]
     # level in 30 runs
     print('level in 30 runs')
     for i in range(30):
+        # seed = int('%04i'%random.randint(1,9999))
+        # print('Seed {}'.format(seed))
         print('Run {}'.format(i))
-        r = xgb_level2(train_x, train_y, test_x)
-
+        r = xgb_level2(train_x, train_y, test_x, seeds[i])
+        e = etc_level2(train_x, train_y, test_x, seeds[i])
         print (r.shape, r)
 
         pred1 = pred1 + r
         #pred2 += nn_level2(train_x, train_y, test_x)
 
     # combine by averaging
-    pred = (pred1/30)/2
-    #pred2 = pred2/30
-    #pred = (pred1 + pred2)/2
+    pred2 = (pred1/30)
+    pred3 = pred2/30
+    pred = (pred1 + pred2)/2
     
     submit(pred, ids)

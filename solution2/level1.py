@@ -103,7 +103,7 @@ def train_data_from_level1(df, train_split):
     
     # random forest on raw
     clf1 = RandomForestClassifier(
-        n_estimators=100,
+        n_estimators=1000,
         bootstrap=True,
         criterion='entropy',
         min_samples_split=4,
@@ -122,7 +122,7 @@ def train_data_from_level1(df, train_split):
     
     # extra trees on tfidf
     clf2 = ExtraTreesClassifier(
-        n_estimators=100,
+        n_estimators=1000,
         max_features=50,
         criterion='entropy',
         min_samples_split=4,
@@ -137,7 +137,7 @@ def train_data_from_level1(df, train_split):
 
     print(pred2)
 
-    clf3 = ExtraTreesClassifier(n_estimators=100,
+    clf3 = ExtraTreesClassifier(n_estimators=1000,
                             max_features=50,
                             criterion='gini',
                             min_samples_split=4,

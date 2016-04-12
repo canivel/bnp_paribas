@@ -9,6 +9,7 @@
 import numpy as np
 import theano
 import xgboost as xgb
+from sklearn.ensemble import ExtraTreesClassifier
 from lasagne.layers import DenseLayer
 from lasagne.layers import InputLayer
 from lasagne.layers import DropoutLayer
@@ -17,7 +18,7 @@ from lasagne.updates import nesterov_momentum, adagrad
 from nolearn.lasagne import NeuralNet
 import random
 
-def xgb_level2(train_x, train_y, test_x):
+def xgb_level2(train_x, train_y, test_x, seed):
     '''
     xgb proba predict for level 2
     '''
@@ -30,7 +31,7 @@ def xgb_level2(train_x, train_y, test_x):
     dtest = xgb.DMatrix(test_x)
     watchlist = [(dtrain,'train'), (deval,'eval')]
     evals_result = {}
-    seed = int('%04i'%random.randint(1,9999))
+
     param = {
         'objective': 'binary:logistic',
         'learning_rate': 0.05,
@@ -50,6 +51,24 @@ def xgb_level2(train_x, train_y, test_x):
     bst = xgb.train(param, dtrain, num_rounds, watchlist, early_stopping_rounds=15, evals_result=evals_result)
     pred = bst.predict(dtest, ntree_limit=bst.best_iteration)
     print(pred.shape)
+    return pred
+
+
+def etc_level2(train_x, train_y, test_x, seed):
+
+    clf2 = ExtraTreesClassifier(
+        n_estimators=1000,
+        max_features=50,
+        criterion='entropy',
+        min_samples_split=4,
+        max_depth=35,
+        min_samples_leaf=2,
+        n_jobs=-1,
+        random_state=seed,
+        verbose=2
+    )
+    clf2.fit(train_x, train_y)
+    pred = clf2.predict_proba(test_x).astype(np.float32)
     return pred
 
 def nn_level2(train_x, train_y, test_x):
