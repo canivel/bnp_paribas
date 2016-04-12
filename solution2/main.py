@@ -20,7 +20,7 @@ if __name__ == '__main__':
     print('Load data...')
 
     tot = pd.read_csv('../ensemble/data/new_train.csv')
-    tot = tot.drop(['n0'], axis=1)
+    #tot = tot.drop(['n0'], axis=1)
     train = tot[tot['target']!=-1].copy()
     test = tot[tot['target']==-1].copy()
 
@@ -41,7 +41,10 @@ if __name__ == '__main__':
     for i in range(30):
         print('Run {}'.format(i))
         r = xgb_level2(train_x, train_y, test_x)
-        pred1 = np.sum(pred1, r)
+
+        print (r.shape, r)
+
+        pred1 = pred1 + r
         #pred2 += nn_level2(train_x, train_y, test_x)
 
     # combine by averaging
