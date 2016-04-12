@@ -19,11 +19,11 @@ test = tot[tot['target']==-1].copy()
 target = train['target'].copy()
 id_test = test['ID'].copy().values
 
-train = train.drop(['target', 'ID', 'n0'], axis=1)
-test = test.drop(['target', 'ID', 'n0'], axis=1)
+train = train.drop(['target', 'ID'], axis=1)
+test = test.drop(['target', 'ID'], axis=1)
 
 print('Training...')
-etc1 = ExtraTreesClassifier(n_estimators=1000,
+etc1 = ExtraTreesClassifier(n_estimators=100,
                             max_features=50,
                             criterion='entropy',
                             min_samples_split=4,
@@ -33,7 +33,7 @@ etc1 = ExtraTreesClassifier(n_estimators=1000,
                             random_state=2017,
                             verbose=2)
 
-etc2 = ExtraTreesClassifier(n_estimators=1000,
+etc2 = ExtraTreesClassifier(n_estimators=100,
                             max_features=50,
                             criterion='gini',
                             min_samples_split=4,
@@ -54,20 +54,20 @@ etc3 = ExtraTreesClassifier(n_estimators=100,
                             warm_start=True,
                             verbose=2)
 
-rf1 = RandomForestClassifier(bootstrap=True,
+rf1 = RandomForestClassifier(n_estimators=100,
+                             bootstrap=True,
                                  criterion='entropy',
                                  min_samples_split=4,
                                  min_samples_leaf=2,
                                  max_features=50,
                                  max_depth=35,
-                                 n_estimators=1000,
                                  n_jobs=4,
                                  oob_score=False,
                                  random_state=1301,
                                  verbose=2)
 
 xgb1 = xgb.XGBClassifier(max_depth=11,
-                            n_estimators=1000,
+                            n_estimators=100,
                             learning_rate=0.05,
                             subsample=0.96,
                             colsample_bytree=0.40,
@@ -92,11 +92,11 @@ X_train, X_test, y_train, y_test = cross_validation.train_test_split(train, targ
 clfs = [('etc', etc1), ('rf', rf1), ('xgb', xgb1), ('etc2', etc2)]
 # # set up ensemble of rf_1 and rf_2
 clf = VotingClassifier(estimators=clfs, voting='soft', weights=[1, 1, 1, 1])
-# st = time.time()
-# scores = cross_validation.cross_val_score(clf, X_train, y_train, scoring='log_loss', cv=5, verbose=2)
-# print(scores.mean()*-1)
-# print("time elaspe", time.time() - st)
-# exit()
+st = time.time()
+scores = cross_validation.cross_val_score(clf, X_train, y_train, scoring='log_loss', cv=5, verbose=2)
+print(scores.mean()*-1)
+print("time elaspe", time.time() - st)
+exit()
 
 clf.fit(train, target)
 print('Predict...')
