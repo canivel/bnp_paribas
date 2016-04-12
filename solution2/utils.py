@@ -18,9 +18,5 @@ def load_data_by_df(df_train, df_test, train_split):
     test_x = test_data_from_level1(df_test, clf1, clf2, clf3, clf4)
     return train_x, train_y, test_x
 
-def submit(submit_arr):
-    sample_submit_df = pd.read_csv(r'../data/sample_submission.csv')
-    submit_arr = np.insert(submit_arr, 0, range(1, sample_submit_df.shape[0]+1), axis=1)
-    submit_df = pd.DataFrame(submit_arr, columns=sample_submit_df.columns)
-    submit_df['id'] = submit_df['id'].apply(lambda x: int(x))
-    submit_df.to_csv('submission_real_ensemble.csv', index=False)
+def submit(preds, ids):
+    pd.DataFrame({"ID": ids, "PredictedProb": preds}).to_csv('ensemble_sub_1.csv', index=False)

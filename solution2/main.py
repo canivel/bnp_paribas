@@ -23,6 +23,7 @@ if __name__ == '__main__':
     #tot = tot.drop(['n0'], axis=1)
     train = tot[tot['target']!=-1].copy()
     test = tot[tot['target']==-1].copy()
+    ids = test['ID'].values
 
     print('Split data')
     train_x, train_y, test_x = load_data_by_df(train, test, train_split)
@@ -52,4 +53,4 @@ if __name__ == '__main__':
     #pred2 = pred2/30
     #pred = (pred1 + pred2)/2
     
-    submit(pred)
+    submit(pred, ids)
