@@ -15,6 +15,7 @@ from lasagne.layers import DropoutLayer
 from lasagne.nonlinearities import softmax
 from lasagne.updates import nesterov_momentum, adagrad
 from nolearn.lasagne import NeuralNet
+import random
 
 def xgb_level2(train_x, train_y, test_x):
     '''
@@ -29,19 +30,26 @@ def xgb_level2(train_x, train_y, test_x):
     dtest = xgb.DMatrix(test_x)
     watchlist = [(dtrain,'train'), (deval,'eval')]
     evals_result = {}
+    seed = int('%04i'%random.randint(1,9999))
     param = {
-        'max_depth':11,
-        'eta':0.0825,
-        'subsample':0.96,
-        'colsample_bytree':0.4,
-        'objective':'binary:logistic',
-        'eval_metric':'mlogloss',
-        'num_class':2}
+        'objective': 'binary:logistic',
+        'learning_rate': 0.05,
+        # 'eta':0.05,
+        # 'n_estimators': 1500,
+        'subsample': 1,
+        'colsample_bytree': 0.4,
+        'colsample_bylevel': 0.4,
+        'max_depth': 11,
+        'eval_metric': 'logloss',
+        'silent': 0,
+        'nthread': 4,
+        'seed': seed
+    }
     num_rounds = 10000
     
     bst = xgb.train(param, dtrain, num_rounds, watchlist, early_stopping_rounds=15, evals_result=evals_result)
     pred = bst.predict(dtest, ntree_limit=bst.best_iteration)
-    
+    print(pred.shape)
     return pred
 
 def nn_level2(train_x, train_y, test_x):

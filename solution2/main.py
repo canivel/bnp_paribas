@@ -14,13 +14,13 @@ from utils import *
 if __name__ == '__main__':
 
     # set the l1_train/l2_train split ratio
-    train_split = 80000
+    train_split = 30000
     # train_x, train_y, test_x = load_data('../data/test.csv', '../data/train.csv', train_split)
 
     print('Load data...')
 
     tot = pd.read_csv('../ensemble/data/new_train.csv')
-
+    tot = tot.drop(['n0'], axis=1)
     train = tot[tot['target']!=-1].copy()
     test = tot[tot['target']==-1].copy()
 
@@ -31,19 +31,22 @@ if __name__ == '__main__':
     num_classes = len(np.unique(train_y))
     num_tests = test_x.shape[0]
 
-    pred1 = np.zeros((num_tests, num_classes)).astype(np.float32)
-    pred2 = np.zeros((num_tests, num_classes)).astype(np.float32)
+    pred1 = np.zeros(num_tests).astype(np.float32)
+    print(pred1.shape)
+    print(pred1)
+    #pred2 = np.zeros((num_tests, num_classes)).astype(np.float32)
 
     # level in 30 runs
     print('level in 30 runs')
     for i in range(30):
         print('Run {}'.format(i))
-        pred1 += xgb_level2(train_x, train_y, test_x)
-        pred2 += nn_level2(train_x, train_y, test_x)
+        r = xgb_level2(train_x, train_y, test_x)
+        pred1 = np.sum(pred1, r)
+        #pred2 += nn_level2(train_x, train_y, test_x)
 
     # combine by averaging
-    pred1 = pred1/30
-    pred2 = pred2/30
-    pred = (pred1 + pred2)/2
+    pred = (pred1/30)/2
+    #pred2 = pred2/30
+    #pred = (pred1 + pred2)/2
     
     submit(pred)
