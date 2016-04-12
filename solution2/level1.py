@@ -44,11 +44,17 @@ def train_data_from_level1(df, train_split):
     #
     # X = df.drop(['target', 'ID'], axis=1)
     # test = df.drop(['target', 'ID'], axis=1)
+    df = df.iloc[np.random.permutation(len(df))]
+    print(df.head())
+    y = df['target'].copy()
+    X = df.drop(['target', 'ID'], axis=1).copy()
 
-    X = df.values.copy()
-    # random shuffle the training data
-    np.random.shuffle(X)
-    X, y = X[:, 1:-1].astype(np.float32), X[:, -1]
+    # # random shuffle the training data
+    # np.random.shuffle(X)
+    # X, y = X[:, 1:-1].astype(np.float32), X[:, -1]
+    # print (X[:10])
+    # print (y[:10])
+    # exit()
     
     # label encoding
     # encoder = LabelEncoder()
