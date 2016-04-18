@@ -2,6 +2,7 @@ import pandas as pd
 from utils import *
 from sklearn.preprocessing import Imputer
 from sklearn.ensemble import ExtraTreesClassifier
+from sklearn.neighbors import KNeighborsClassifier
 import predict_nans
 
 '''*****************************************************************'''
@@ -46,7 +47,7 @@ tot['logit_feat'] = logit_feat
 '''****************************factorize****************************'''
 '''*****************************************************************'''
 for col in groupc:
-    tot[col] = pd.factorize(tot[col], na_sentinel=-9999)[0]
+    tot[col] = pd.factorize(tot[col])[0]
 
 
 '''*****************************************************************'''
@@ -54,13 +55,14 @@ for col in groupc:
 '''*****************************************************************'''
 tot['v50'] = tot['v50'] ** 0.125
 #tot['v62'] = np.log(tot['v62'] + 0.1)
-
-tot.drop(['v8', 'v25', 'v46', 'v54', 'v63', 'v89'], axis=1, inplace=True) #group1 feats
-tot.drop(['v107', 'v79', 'v75', 'v110'], axis=1, inplace=True) #cat feats
+tot.to_csv('data/new_train_with_nans.csv', index=False)
+exit()
+# tot.drop(['v8', 'v25', 'v46', 'v54', 'v63', 'v89'], axis=1, inplace=True) #group1 feats
+# tot.drop(['v107', 'v79', 'v75', 'v110'], axis=1, inplace=True) #cat feats
 
 partial_train = tot[tot['target']!=-1].copy()
 partial_test = tot[tot['target']==-1].copy()
-estimator = ExtraTreesClassifier(n_estimators=300, n_jobs=-1)
+estimator = KNeighborsClassifier()
 
 not_null_features = []
 has_null_features = []
@@ -70,38 +72,42 @@ for f in tot.columns:
     else:
         has_null_features.append(f)
 
+categories = groupc
+print categories
+
 for f in has_null_features:
-    if(f != 'ID' and f != 'target'):
-        print('Predict {}'.format(f))
-        feature_train = partial_train[not_null_features].loc[(partial_train[f].notnull())].values
-        feature_train_test = partial_train[not_null_features].loc[(partial_train[f].isnull())].values
-        label_train = partial_train['target'].loc[(partial_train[f].notnull())].values
+    print('Predict {}'.format(f))
+    feature_train = partial_train[not_null_features].loc[(partial_train[f].notnull())]
+    feature_train_test = partial_train[not_null_features].loc[(partial_train[f].isnull())]
+    label_train = partial_train['target'].loc[(partial_train[f].notnull())].values
 
-        nan_features_test = partial_test[not_null_features].loc[(partial_test[f].notnull())].values
-        nan_labels_test = partial_test[not_null_features].loc[(partial_test[f].notnull())].values
+    feature_train = feature_train.drop(['ID', 'target'], axis=1).values
+    feature_train_test = feature_train_test.drop(['ID', 'target'], axis=1).values
 
-        y_test = partial_test[not_null_features].loc[(partial_train[f].isnull())].values[:, 1::]
+    nan_features_test = partial_test[not_null_features].loc[(partial_test[f].notnull())]
+    y_test = partial_test[not_null_features].loc[(partial_test[f].isnull())]
+    nan_labels_test = partial_test['target'].loc[(partial_test[f].notnull())].values
 
-        new_feature_train, new_feature_test = predict_nans.predict_nans(feature_train,
-                                                                        label_train,
-                                                                        feature_train_test,
-                                                                        nan_features_test,
-                                                                        nan_labels_test,
-                                                                        y_test,
-                                                                        estimator)
+    nan_features_test = nan_features_test.drop(['ID', 'target'], axis=1).values
+    y_test = y_test.drop(['ID', 'target'], axis=1).values
 
-        partial_train.loc[partial_train[f].isnull(), f] = new_feature_train
-        partial_test.loc[(partial_test[f].isnull()), partial_test] = new_feature_test
+    new_feature_train, new_feature_test = predict_nans.predict_nans(feature_train,
+                                                                    label_train,
+                                                                    feature_train_test,
+                                                                    nan_features_test,
+                                                                    nan_labels_test,
+                                                                    y_test,
+                                                                    estimator)
 
-        partial_train[f] = new_feature_train
-        partial_test[f] = new_feature_test
+    partial_train.loc[partial_train[f].isnull(), f] = new_feature_train
+    partial_test.loc[(partial_test[f].isnull()), f] = new_feature_test
 
-        print('Predict {} Done!'.format(f))
+    print('Predict {} Done!'.format(f))
 
 
 tot = partial_train.append(partial_test)
 
-# tot = tot.fillna(-9999)
+tot = tot.fillna(-9999)
 
 
 '''*****************************************************************'''
@@ -112,6 +118,6 @@ tot = partial_train.append(partial_test)
 '''*****************************************************************'''
 '''*****************************output******************************'''
 '''*****************************************************************'''
-tot.to_csv('data/new_train_pred_nans.csv', index=False)
+tot.to_csv('data/new_train_pred_nans2.csv', index=False)
 
 print tot.head()
